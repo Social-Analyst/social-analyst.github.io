@@ -1,0 +1,83 @@
+const { API, SUPABASE_URL, SUPABASE_ANON } = window.SA_CONFIG;
+const $ = (id) => document.getElementById(id);
+const result = $("result");
+
+$("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = $("u").value.trim().replace(/^@/, "").toLowerCase();
+  $("b").disabled = true;
+  result.style.display = "block";
+  result.innerHTML = `<div class="status"><span class="spin"></span> Submitting…</div>`;
+  try {
+    const r = await fetch(`${API}/api/public/jobs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "Submit failed");
+    await poll(j.id, username);
+  } catch (err) {
+    result.innerHTML = `<div class="err">${escapeHtml(err.message)}</div>`;
+  } finally { $("b").disabled = false; }
+});
+
+async function poll(id, username) {
+  const start = Date.now();
+  let attempt = 0;
+  while (Date.now() - start < 5 * 60_000) {
+    attempt++;
+    result.innerHTML = `<div class="status"><span class="spin"></span> Analyzing @${escapeHtml(username)}… (${Math.round((Date.now() - start) / 1000)}s)</div>`;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${id}&select=status,result,error`, {
+      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
+    });
+    const rows = await r.json();
+    const job = rows[0];
+    if (job?.status === "done") return render(job.result);
+    if (job?.status === "failed") {
+      result.innerHTML = `<div class="err">Failed: ${escapeHtml(job.error || "unknown error")}</div>`;
+      return;
+    }
+    await new Promise((r) => setTimeout(r, attempt < 5 ? 2000 : 4000));
+  }
+  result.innerHTML = `<div class="err">Timed out. No worker picked up the job — check the admin dashboard.</div>`;
+}
+
+function render(data) {
+  const s = data.summary;
+  const lists = {
+    non_followers: data.non_followers,
+    fans: data.fans,
+    mutuals: data.mutuals,
+  };
+  result.innerHTML = `
+    <div class="summary">
+      <div class="stat"><div class="n">${s.followers}</div><div class="l">Followers</div></div>
+      <div class="stat"><div class="n">${s.following}</div><div class="l">Following</div></div>
+      <div class="stat"><div class="n">${s.non_followers}</div><div class="l">Don't follow back</div></div>
+      <div class="stat"><div class="n">${s.fans}</div><div class="l">Fans</div></div>
+      <div class="stat"><div class="n">${s.mutuals}</div><div class="l">Mutuals</div></div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-k="non_followers">Non-followers (${s.non_followers})</button>
+      <button class="tab" data-k="fans">Fans (${s.fans})</button>
+      <button class="tab" data-k="mutuals">Mutuals (${s.mutuals})</button>
+    </div>
+    <div id="list" class="list"></div>
+  `;
+  const showList = (k) => {
+    $("list").innerHTML = lists[k].map((u) =>
+      `<div class="row"><a href="https://instagram.com/${u.username}" target="_blank">@${escapeHtml(u.username)}</a><span class="full">${escapeHtml(u.full_name || "")}</span></div>`
+    ).join("") || `<div class="row"><span class="full">Empty</span></div>`;
+  };
+  showList("non_followers");
+  document.querySelectorAll(".tab").forEach((t) => {
+    t.onclick = () => {
+      document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+      t.classList.add("active");
+      showList(t.dataset.k);
+    };
+  });
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
