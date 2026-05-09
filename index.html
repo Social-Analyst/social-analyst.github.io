@@ -3,57 +3,592 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Social Analyst — Who follows you back?</title>
-<meta name="description" content="See your Instagram non-followers, fans, and mutuals. Just enter a public username.">
+<title>Social Analyst — Instagram Follower Analytics</title>
+<meta name="description" content="See your Instagram non-followers, fans, and mutuals. Raw data collected by extension, all analysis done here in your browser.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- jsPDF for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
-*{box-sizing:border-box}
-:root{--bg:#0b0b0e;--card:#16161b;--border:#2a2a31;--muted:#8a8a93;--fg:#f2f2f5;--p:#e1306c;--p2:#a259e1}
-body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--fg);min-height:100vh}
-.wrap{max-width:760px;margin:0 auto;padding:80px 24px 60px;text-align:center}
-h1{font-size:clamp(36px,7vw,64px);font-weight:700;line-height:1.05;letter-spacing:-.02em;margin:0 0 8px}
-h1 span{background:linear-gradient(135deg,var(--p),var(--p2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.sub{color:var(--muted);font-size:18px;max-width:520px;margin:16px auto 36px}
-form{display:flex;gap:8px;max-width:480px;margin:0 auto}
-input{flex:1;padding:14px 18px;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--fg);font-size:15px;font-family:inherit}
-input:focus{outline:none;border-color:var(--p)}
-button{padding:14px 22px;background:linear-gradient(135deg,var(--p),var(--p2));border:0;border-radius:12px;color:#fff;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit}
-button:disabled{opacity:.5;cursor:wait}
-.note{color:var(--muted);font-size:12px;margin-top:14px}
-#result{margin-top:40px;text-align:left;display:none}
-.status{padding:24px;background:var(--card);border:1px solid var(--border);border-radius:16px;text-align:center;color:var(--muted)}
-.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--p);border-radius:50%;animation:s 1s linear infinite;vertical-align:middle;margin-right:8px}
-@keyframes s{to{transform:rotate(360deg)}}
-.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
-.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
-.stat .n{font-size:28px;font-weight:700}
-.stat .l{font-size:12px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
-.tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border)}
-.tab{padding:10px 16px;background:none;border:0;color:var(--muted);cursor:pointer;font-family:inherit;font-size:14px;border-bottom:2px solid transparent}
-.tab.active{color:var(--fg);border-bottom-color:var(--p)}
-.list{max-height:400px;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px}
-.row{display:flex;justify-content:space-between;padding:8px 12px;border-radius:6px;font-size:14px}
-.row:hover{background:var(--bg)}
-.row a{color:var(--fg);text-decoration:none}
-.row .full{color:var(--muted);font-size:12px}
-.err{color:#ff6b6b;padding:16px;background:rgba(255,107,107,.1);border-radius:12px;border:1px solid rgba(255,107,107,.3)}
-footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #080810;
+  --bg2:     #0f0f1a;
+  --card:    #11111e;
+  --border:  #1e1e2e;
+  --border2: #2a2a3e;
+  --muted:   #5a5a7a;
+  --dim:     #8a8aaa;
+  --fg:      #eeeef5;
+  --pink:    #e1306c;
+  --purple:  #9b59e1;
+  --grad:    linear-gradient(135deg, #e1306c 0%, #9b59e1 100%);
+  --glow:    0 0 40px rgba(225,48,108,.18), 0 0 80px rgba(155,89,225,.1);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Background noise + gradient ─────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%,  rgba(225,48,108,.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 100%, rgba(155,89,225,.07) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.wrap { position: relative; z-index: 1; max-width: 840px; margin: 0 auto; padding: 0 24px; }
+
+/* ── Nav ──────────────────────────────────────────────────────────────────── */
+nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 0 0;
+}
+
+.logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -.02em;
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.nav-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border2);
+  border-radius: 100px;
+  padding: 4px 12px;
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────────────── */
+.hero {
+  padding: 80px 0 60px;
+  text-align: center;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--pink);
+  border: 1px solid rgba(225,48,108,.25);
+  border-radius: 100px;
+  padding: 5px 14px;
+  margin-bottom: 28px;
+  letter-spacing: .06em;
+}
+
+.hero-eyebrow::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: var(--pink);
+  border-radius: 50%;
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+h1 {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: clamp(36px, 7vw, 68px);
+  line-height: 1;
+  letter-spacing: -.03em;
+  color: var(--fg);
+  margin-bottom: 20px;
+}
+
+h1 em {
+  font-style: normal;
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sub {
+  font-size: 16px;
+  color: var(--dim);
+  max-width: 500px;
+  margin: 0 auto 40px;
+  line-height: 1.65;
+}
+
+/* ── Form ──────────────────────────────────────────────────────────────────── */
+.form-wrap {
+  display: flex;
+  gap: 8px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.input-wrap {
+  flex: 1;
+  position: relative;
+}
+
+.input-wrap .at {
+  position: absolute;
+  left: 14px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 16px;
+  pointer-events: none;
+  font-family: 'DM Mono', monospace;
+}
+
+input[type=text] {
+  width: 100%;
+  padding: 14px 14px 14px 30px;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  color: var(--fg);
+  font: 15px 'DM Sans', sans-serif;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+input[type=text]:focus {
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(225,48,108,.12);
+}
+
+.btn-analyze {
+  padding: 14px 24px;
+  background: var(--grad);
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font: 600 15px 'DM Sans', sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity .2s, transform .1s;
+  box-shadow: var(--glow);
+}
+
+.btn-analyze:hover    { opacity: .88; }
+.btn-analyze:active   { transform: scale(.97); }
+.btn-analyze:disabled { opacity: .4; cursor: wait; }
+
+.form-note {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ── How it works ──────────────────────────────────────────────────────────── */
+.how {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 56px 0 0;
+}
+
+.how-step {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.step-n {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--pink);
+  margin-bottom: 10px;
+  letter-spacing: .08em;
+}
+
+.step-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.step-desc { font-size: 12px; color: var(--dim); line-height: 1.6; }
+
+/* ── Result panel ──────────────────────────────────────────────────────────── */
+#result { margin-top: 48px; }
+
+/* Status / loading */
+.status-card {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 36px;
+  text-align: center;
+  color: var(--dim);
+}
+
+.spinner {
+  display: inline-block;
+  width: 22px; height: 22px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--pink);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 10px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.status-msg {
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.status-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Private account follow notice */
+.follow-notice {
+  background: rgba(225,48,108,.07);
+  border: 1px solid rgba(225,48,108,.25);
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.follow-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.follow-notice h3 {
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pink);
+  margin-bottom: 4px;
+}
+
+.follow-notice p { font-size: 13px; color: var(--dim); line-height: 1.6; }
+
+/* Error */
+.err-card {
+  background: rgba(248,113,113,.07);
+  border: 1px solid rgba(248,113,113,.25);
+  border-radius: 14px;
+  padding: 20px 24px;
+  color: #f87171;
+  font-size: 14px;
+}
+
+/* Profile header */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.avatar {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--border2);
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--pink);
+}
+
+.avatar-fallback {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--grad);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.profile-info { flex: 1; min-width: 0; }
+
+.profile-name {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.profile-handle {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.profile-meta {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+.badge-private {
+  display: inline-block;
+  background: rgba(225,48,108,.15);
+  color: var(--pink);
+  border: 1px solid rgba(225,48,108,.3);
+  border-radius: 100px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  margin-left: 6px;
+}
+
+.export-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  color: var(--dim);
+  font: 13px 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+  white-space: nowrap;
+}
+
+.export-btn:hover { border-color: var(--pink); color: var(--pink); }
+
+/* Stats row */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-n {
+  font-family: 'Syne', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.stat-l {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-family: 'DM Mono', monospace;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.tab {
+  padding: 11px 18px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font: 13px 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+
+.tab:hover  { color: var(--fg); }
+.tab.active { color: var(--fg); border-bottom-color: var(--pink); font-weight: 600; }
+
+/* List */
+.list-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+}
+
+.list-search {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.list-search input {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 7px;
+  padding: 7px 12px;
+  font: 13px 'DM Mono', monospace;
+  color: var(--fg);
+  outline: none;
+}
+
+.list-search input:focus { border-color: var(--pink); }
+
+.list-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.list-scroll::-webkit-scrollbar { width: 4px; }
+.list-scroll::-webkit-scrollbar-track { background: transparent; }
+.list-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background .12s;
+}
+
+.user-row:last-child { border-bottom: 0; }
+.user-row:hover { background: rgba(255,255,255,.025); }
+
+.user-handle {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.user-handle:hover { color: var(--pink); }
+
+.user-name { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+.user-ig {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border2);
+  border-radius: 100px;
+  padding: 3px 10px;
+  text-decoration: none;
+  transition: border-color .15s, color .15s;
+  font-family: 'DM Mono', monospace;
+}
+
+.user-ig:hover { border-color: var(--pink); color: var(--pink); }
+
+.list-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 60px 0 40px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
 </style>
 </head>
 <body>
-<main class="wrap">
-  <h1>Know who actually <span>follows you back</span></h1>
-  <p class="sub">Enter any public Instagram username. Our network of bot workers scans the account and shows your non-followers, fans, and mutuals.</p>
-  <form id="f">
-    <input id="u" required placeholder="instagram username (no @)" autocomplete="off" pattern="[A-Za-z0-9._]{1,30}">
-    <button id="b" type="submit">Analyze</button>
-  </form>
-  <p class="note">Free · no login · public accounts only (or accounts our bot follows)</p>
+
+<div class="wrap">
+  <nav>
+    <span class="logo">Social Analyst</span>
+    <span class="nav-tag">Instagram Analytics</span>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-eyebrow">Live Instagram Analysis</div>
+    <h1>Know who actually<br><em>follows you back</em></h1>
+    <p class="sub">Enter any Instagram username. Our worker extension collects the raw data — all analysis happens right here in your browser.</p>
+
+    <form id="f" autocomplete="off">
+      <div class="form-wrap">
+        <div class="input-wrap">
+          <span class="at">@</span>
+          <input type="text" id="u" required placeholder="username" pattern="[A-Za-z0-9._]{1,30}" spellcheck="false">
+        </div>
+        <button type="submit" class="btn-analyze" id="b">Analyze</button>
+      </div>
+    </form>
+    <p class="form-note">Free · no login required · results computed in your browser</p>
+
+    <div class="how">
+      <div class="how-step">
+        <div class="step-n">STEP 01</div>
+        <div class="step-title">Submit Username</div>
+        <div class="step-desc">Enter any Instagram handle. We queue a collection job on our backend.</div>
+      </div>
+      <div class="how-step">
+        <div class="step-n">STEP 02</div>
+        <div class="step-title">Worker Collects</div>
+        <div class="step-desc">The Chrome extension fetches raw follower & following lists using a logged-in session.</div>
+      </div>
+      <div class="how-step">
+        <div class="step-n">STEP 03</div>
+        <div class="step-title">Site Analyses</div>
+        <div class="step-desc">Your browser processes the lists instantly — no server sees your data.</div>
+      </div>
+      <div class="how-step">
+        <div class="step-n">STEP 04</div>
+        <div class="step-title">Download PDF</div>
+        <div class="step-desc">Export a full report with all lists as a PDF for offline use.</div>
+      </div>
+    </div>
+  </section>
+
   <section id="result"></section>
-</main>
-<footer>© Social Analyst · Not affiliated with Instagram or Meta.</footer>
+</div>
+
+<footer>
+  © Social Analyst · Not affiliated with Instagram or Meta.<br>
+  Analysis runs entirely in your browser — no data is stored or sold.
+</footer>
+
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>
