@@ -67,8 +67,14 @@ function render(data) {
   `;
   const showList = (k) => {
     $("list").innerHTML = lists[k].map((u) =>
-      `<div class="row"><a href="https://instagram.com/${u.username}" target="_blank">@${escapeHtml(u.username)}</a><span class="full">${escapeHtml(u.full_name || "")}</span></div>`
-    ).join("") || `<div class="row"><span class="full">Empty</span></div>`;
+      `<a class="row" href="https://instagram.com/${encodeURIComponent(u.username)}" target="_blank" rel="noopener noreferrer">
+        <div class="row-left">
+          <span class="row-handle">@${escapeHtml(u.username)}</span>
+          ${u.full_name ? `<span class="row-name">${escapeHtml(u.full_name)}</span>` : ""}
+        </div>
+        <span class="row-arrow">↗</span>
+      </a>`
+    ).join("") || `<div class="row"><span class="row-name">Empty</span></div>`;
   };
   showList("non_followers");
   document.querySelectorAll(".tab").forEach((t) => {

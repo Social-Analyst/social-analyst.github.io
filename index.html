@@ -22,6 +22,10 @@ input:focus{outline:none;border-color:var(--p)}
 button{padding:14px 22px;background:linear-gradient(135deg,var(--p),var(--p2));border:0;border-radius:12px;color:#fff;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit}
 button:disabled{opacity:.5;cursor:wait}
 .note{color:var(--muted);font-size:12px;margin-top:14px}
+.tips{display:flex;flex-direction:column;gap:6px;max-width:480px;margin:18px auto 0;text-align:left}
+.tip{display:flex;align-items:flex-start;gap:8px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--muted);line-height:1.45}
+.tip-icon{font-size:15px;flex-shrink:0;margin-top:1px}
+.tip strong{color:var(--fg);font-weight:500}
 #result{margin-top:40px;text-align:left;display:none}
 .status{padding:24px;background:var(--card);border:1px solid var(--border);border-radius:16px;text-align:center;color:var(--muted)}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--p);border-radius:50%;animation:s 1s linear infinite;vertical-align:middle;margin-right:8px}
@@ -34,10 +38,13 @@ button:disabled{opacity:.5;cursor:wait}
 .tab{padding:10px 16px;background:none;border:0;color:var(--muted);cursor:pointer;font-family:inherit;font-size:14px;border-bottom:2px solid transparent}
 .tab.active{color:var(--fg);border-bottom-color:var(--p)}
 .list{max-height:400px;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px}
-.row{display:flex;justify-content:space-between;padding:8px 12px;border-radius:6px;font-size:14px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;font-size:14px;text-decoration:none;color:var(--fg);transition:background .15s}
 .row:hover{background:var(--bg)}
-.row a{color:var(--fg);text-decoration:none}
-.row .full{color:var(--muted);font-size:12px}
+.row:hover .row-arrow{opacity:1}
+.row-left{display:flex;flex-direction:column;gap:2px}
+.row-handle{color:var(--fg);font-weight:500}
+.row-name{color:var(--muted);font-size:12px}
+.row-arrow{opacity:0;color:var(--muted);font-size:13px;transition:opacity .15s;flex-shrink:0}
 .err{color:#ff6b6b;padding:16px;background:rgba(255,107,107,.1);border-radius:12px;border:1px solid rgba(255,107,107,.3)}
 footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
 </style>
@@ -45,12 +52,16 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
 <body>
 <main class="wrap">
   <h1>Know who actually <span>follows you back</span></h1>
-  <p class="sub">Enter any public Instagram username. Our network of bot workers scans the account and shows your non-followers, fans, and mutuals.</p>
+  <p class="sub">Enter any public Instagram username. Our official page scans the account and shows your non-followers, fans, and mutuals.</p>
   <form id="f">
     <input id="u" required placeholder="instagram username (no @)" autocomplete="off" pattern="[A-Za-z0-9._]{1,30}">
     <button id="b" type="submit">Analyze</button>
   </form>
-  <p class="note">Free · no login · public accounts only (or accounts our bot follows)</p>
+  <p class="note">Free · no login · public accounts only (or accounts our official page follows)</p>
+  <div class="tips">
+    <div class="tip"><span class="tip-icon">👤</span><span>Make sure our <strong>official account is following you</strong> before running a scan on a private profile.</span></div>
+    <div class="tip"><span class="tip-icon">🔓</span><span>If your account is <strong>private</strong>, please <strong>accept our follow request</strong> so we can access your data.</span></div>
+  </div>
   <section id="result"></section>
 </main>
 <footer>© Social Analyst · Not affiliated with Instagram or Meta.</footer>
