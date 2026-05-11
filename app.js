@@ -1,6 +1,22 @@
-const { API, SUPABASE_URL, SUPABASE_ANON } = window.SA_CONFIG;
+const { API, SUPABASE_URL, SUPABASE_ANON, OWNER_USERNAME, TIPS } = window.SA_CONFIG;
 const $ = (id) => document.getElementById(id);
 const result = $("result");
+
+// Render tip cards from config into the page
+(function renderTips() {
+  const container = document.getElementById("tips");
+  if (!container || !Array.isArray(TIPS)) return;
+  container.innerHTML = TIPS.map((t) =>
+    `<div class="tip"><span class="tip-icon">${t.icon}</span><span>${t.text}</span></div>`
+  ).join("");
+})();
+
+// Filter out the owner account from any list
+function filterOwner(list) {
+  if (!OWNER_USERNAME) return list;
+  const owner = OWNER_USERNAME.trim().toLowerCase();
+  return list.filter((u) => u.username.toLowerCase() !== owner);
+}
 
 $("f").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -46,9 +62,9 @@ async function poll(id, username) {
 function render(data) {
   const s = data.summary;
   const lists = {
-    non_followers: data.non_followers,
-    fans: data.fans,
-    mutuals: data.mutuals,
+    non_followers: filterOwner(data.non_followers),
+    fans:          filterOwner(data.fans),
+    mutuals:       filterOwner(data.mutuals),
   };
   result.innerHTML = `
     <div class="summary">
@@ -59,16 +75,22 @@ function render(data) {
       <div class="stat"><div class="n">${s.mutuals}</div><div class="l">Mutuals</div></div>
     </div>
     <div class="tabs">
-      <button class="tab active" data-k="non_followers">Non-followers (${s.non_followers})</button>
-      <button class="tab" data-k="fans">Fans (${s.fans})</button>
-      <button class="tab" data-k="mutuals">Mutuals (${s.mutuals})</button>
+      <button class="tab active" data-k="non_followers">Non-followers (${lists.non_followers.length})</button>
+      <button class="tab" data-k="fans">Fans (${lists.fans.length})</button>
+      <button class="tab" data-k="mutuals">Mutuals (${lists.mutuals.length})</button>
     </div>
     <div id="list" class="list"></div>
   `;
   const showList = (k) => {
     $("list").innerHTML = lists[k].map((u) =>
-      `<div class="row"><a href="https://instagram.com/${u.username}" target="_blank">@${escapeHtml(u.username)}</a><span class="full">${escapeHtml(u.full_name || "")}</span></div>`
-    ).join("") || `<div class="row"><span class="full">Empty</span></div>`;
+      `<a class="row" href="https://instagram.com/${encodeURIComponent(u.username)}" target="_blank" rel="noopener noreferrer">
+        <div class="row-left">
+          <span class="row-handle">@${escapeHtml(u.username)}</span>
+          ${u.full_name ? `<span class="row-name">${escapeHtml(u.full_name)}</span>` : ""}
+        </div>
+        <span class="row-arrow">↗</span>
+      </a>`
+    ).join("") || `<div class="row"><span class="row-name">Empty</span></div>`;
   };
   showList("non_followers");
   document.querySelectorAll(".tab").forEach((t) => {
