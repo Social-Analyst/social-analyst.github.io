@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Social Analyst — Who follows you back?</title>
 <meta name="description" content="See your Instagram non-followers, fans, and mutuals. Just enter a public username.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://googleapis.com">
+<link rel="preconnect" href="https://gstatic.com" crossorigin>
+<link href="https://googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box}
 :root{--bg:#0b0b0e;--card:#16161b;--border:#2a2a31;--muted:#8a8a93;--fg:#f2f2f5;--p:#e1306c;--p2:#a259e1}
@@ -39,8 +39,7 @@ button:disabled{opacity:.5;cursor:wait}
 .row .user-meta{display:flex;flex-direction:column}
 .row .handle{font-weight:600;color:var(--fg)}
 .row .full{color:var(--muted);font-size:12px;margin-top:2px}
-.row .app-btn{background:var(--p);color:#fff;text-decoration:none;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;transition:transform 0.1s ease}
-.row .app-btn:active{transform:scale(0.96)}
+.row .app-btn{background:var(--p);color:#fff;text-decoration:none;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 .err{color:#ff6b6b;padding:16px;background:rgba(255,107,107,.1);border-radius:12px;border:1px solid rgba(255,107,107,.3)}
 footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
 </style>
@@ -54,101 +53,127 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
     <button id="b" type="submit">Analyze</button>
   </form>
   <p class="note">Free · no login · public accounts only (or accounts our bot follows)</p>
-  
   <section id="result"></section>
 </main>
 <footer>© Social Analyst · Not affiliated with Instagram or Meta.</footer>
 
 <script>
-  // 🔗 CONFIGURATION: REPLACE THIS WITH YOUR LIVE RENDER URL
-  const SERVER_URL = "https://onrender.com";
+  // Hardcoded direct database reference routes to remove external multi-file network dependencies
+  const SUPABASE_URL = "https://cqwtcectvjfeqskpakmt.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwiZXhwIjoyMTA2NjE2NjE2fQ.eyJhYkdjaU9pSklVekkxTmlJc0luUjVjQ0k2SWtwWFYyX3NpZF9jb29raWUiOiIyMzY5NTkwNzQxMCUzQTJodWk2aDFPWGM4VWNtJTNBMjUlM0FBWW1YVkxyU3lzMTJzTjZQNEQ5SnFTYnFRa21EX3Z4Y3VwV240aTBTMGcifQ"; 
+  
+  const \$ = (id) => document.getElementById(id);
+  const result = \$("result");
 
-  const form = document.getElementById('f');
-  const input = document.getElementById('u');
-  const submitBtn = document.getElementById('b');
-  const resultSection = document.getElementById('result');
-
-  let currentData = { nonFollowers: [], mutuals: [], fans: [] };
-  let currentTab = 'non';
-
-  form.onsubmit = async (e) => {
+  \$("f").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const targetUser = input.value.trim().toLowerCase();
-    if(!targetUser) return;
-
-    // Show spinning status loader state
-    submitBtn.disabled = true;
-    resultSection.style.display = 'block';
-    resultSection.innerHTML = `<div class="status"><span class="spin"></span>Bot network is dispatching request to @${targetUser}... This takes roughly 30s while our cloud container processes loops.</div>`;
-
+    const username = \$("u").value.trim().replace(/^@/, "").toLowerCase();
+    \$("b").disabled = true;
+    result.style.display = "block";
+    result.innerHTML = `<div class="status"><span class="spin"></span> Dropping request into bot queue...</div>`;
+    
     try {
-      const res = await fetch(`${SERVER_URL}/api/run-bot-scan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUsername: targetUser })
+      // 🚀 WRITING DIRECTLY TO SUPABASE PIPELINE GATEWAYS
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON,
+          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Prefer": "return=representation"
+        },
+        body: JSON.stringify({ username: username, status: 'pending' }),
       });
-      const data = await res.json();
-      if(!data.success) throw new Error(data.error || 'Server parsing error.');
-
-      currentData.nonFollowers = data.nonFollowers || [];
-      currentData.mutuals = data.mutuals || [];
-      currentData.fans = data.fans || [];
-
-      renderDashboard();
-    } catch(err) {
-      resultSection.innerHTML = `<div class="err">⚠️ **Error Event**: ${err.message}. If the server timed out, please wait 30 seconds and click analyze again.</div>`;
-      submitBtn.disabled = false;
+      
+      const resData = await r.json();
+      const job = Array.isArray(resData) ? resData[0] : resData;
+      if (!r.ok || !job?.id) throw new Error("Could not queue job inside database framework.");
+      
+      await poll(job.id, username);
+    } catch (err) {
+      result.innerHTML = `<div class="err">⚠️ Connection Blocked: ${escapeHtml(err.message)}</div>`;
+    } finally { 
+      \$("b").disabled = false; 
     }
-  };
+  });
 
-  function renderDashboard() {
-    submitBtn.disabled = false;
-    resultSection.innerHTML = `
+  async function poll(id, username) {
+    const start = Date.now();
+    let attempt = 0;
+    while (Date.now() - start < 5 * 60_000) {
+      attempt++;
+      result.innerHTML = `<div class="status"><span class="spin"></span> Bot network running analytics loop on @${escapeHtml(username)}… (${Math.round((Date.now() - start) / 1000)}s)</div>`;
+      
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${id}&select=status,result,error`, {
+          headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` },
+        });
+        const rows = await r.json();
+        const job = Array.isArray(rows) ? rows[0] : rows;
+        
+        if (job?.status === "done") return render(job.result);
+        if (job?.status === "failed") {
+          result.innerHTML = `<div class="err">Scraper Exception: ${escapeHtml(job.error || "unknown error")}</div>`;
+          return;
+        }
+      } catch (e) {
+        console.warn("Retrying database poll...");
+      }
+      await new Promise((r) => setTimeout(r, attempt < 5 ? 2000 : 4000));
+    }
+    result.innerHTML = `<div class="err">Timed out waiting for the cloud bot worker. Check Render terminal dashboard logs.</div>`;
+  }
+
+  function render(data) {
+    const s = data.summary;
+    const lists = {
+      non_followers: data.non_followers || [],
+      fans: data.fans || [],
+      mutuals: data.mutuals || [],
+    };
+    
+    result.innerHTML = `
       <div class="summary">
-        <div class="stat"><div class="n" id="c-non">${currentData.nonFollowers.length}</div><div class="l">Non-Followers</div></div>
-        <div class="stat"><div class="n" id="c-mut">${currentData.mutuals.length}</div><div class="l">Mutuals</div></div>
-        <div class="stat"><div class="n" id="c-fans">${currentData.fans.length}</div><div class="l">Fans</div></div>
+        <div class="stat"><div class="n">${s.followers}</div><div class="l">Followers</div></div>
+        <div class="stat"><div class="n">${s.following}</div><div class="l">Following</div></div>
+        <div class="stat"><div class="n">${s.non_followers}</div><div class="l">Don't follow back</div></div>
+        <div class="stat"><div class="n">${s.fans}</div><div class="l">Fans</div></div>
+        <div class="stat"><div class="n">${s.mutuals}</div><div class="l">Mutuals</div></div>
       </div>
       <div class="tabs">
-        <button onclick="switchTab('non')" id="t-non" class="tab active">Non-Followers</button>
-        <button onclick="switchTab('mut')" id="t-mut" class="tab">Mutuals</button>
-        <button onclick="switchTab('fans')" id="t-fans" class="tab">Fans</button>
+        <button class="tab active" id="t-non" onclick="switchTab('non')">Non-followers (${s.non_followers})</button>
+        <button class="tab" id="t-fans" onclick="switchTab('fans')">Fans (${s.fans})</button>
+        <button class="tab" id="t-mut" onclick="switchTab('mutuals')">Mutuals (${s.mutuals})</button>
       </div>
-      <div class="list" id="list-container"></div>
+      <div id="list" class="list"></div>
     `;
-    renderList();
+    
+    window.currentLists = lists;
+    switchTab('non');
   }
 
-  window.switchTab = function(tabName) {
-    currentTab = tabName;
+  window.switchTab = function(k) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.getElementById(`t-${tabName === 'non' ? 'non' : tabName === 'mut' ? 'mut' : 'fans'}`).classList.add('active');
-    renderList();
+    if(k === 'non') document.getElementById('t-non').classList.add('active');
+    if(k === 'fans') document.getElementById('t-fans').classList.add('active');
+    if(k === 'mutuals') document.getElementById('t-mut').classList.add('active');
+
+    const listKey = k === 'non' ? 'non_followers' : k === 'fans' ? 'fans' : 'mutuals';
+    const items = window.currentLists[listKey];
+    
+    \$("list").innerHTML = items.map((u) =>
+      `<div class="row">
+        <div class="user-meta">
+          <span class="handle">@${escapeHtml(u.username)}</span>
+          <span class="full">${escapeHtml(u.full_name || "Instagram Profile")}</span>
+        </div>
+        <a href="instagram://user?username=${escapeHtml(u.username)}" class="app-btn">View App ↗</a>
+      </div>`
+    ).join("") || `<div class="row"><span class="full">Empty array list context.</span></div>`;
   }
 
-  function renderList() {
-    const container = document.getElementById('list-container');
-    container.innerHTML = '';
-    const activeList = currentTab === 'non' ? currentData.nonFollowers : currentTab === 'mut' ? currentData.mutuals : currentData.fans;
-
-    if(activeList.length === 0) {
-      container.innerHTML = '<div style="color:var(--muted); text-align:center; padding:30px; font-size:14px;">No profile logs inside this relationship branch loop array.</div>';
-      return;
-    }
-
-    activeList.forEach(user => {
-      const row = document.createElement('div');
-      row.className = 'row';
-      row.innerHTML = `
-        <div class="user-meta">
-          <span class="handle">@${user.username}</span>
-          <span class="full">${user.name || 'Instagram User'}</span>
-        </div>
-        <!-- 📱 NATIVE DEEP-LINK WRAPPER TO FORCIBLY OPEN PROFILES STRAIGHT INSIDE THE NATIVE APP ON PHONES -->
-        <a href="instagram://user?username=${user.username}" class="app-btn">View App ↗</a>
-      `;
-      container.appendChild(row);
-    });
+  function escapeHtml(s) { 
+    return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c])); 
   }
 </script>
 </body>
