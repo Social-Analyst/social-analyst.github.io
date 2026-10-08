@@ -4,7 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { IgApiClient } = require('instagram-private-api');
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 const { SUPABASE_URL, SUPABASE_SERVICE_KEY, BOT_SESSION_COOKIE } = process.env;
