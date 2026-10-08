@@ -1,40 +1,41 @@
-const express = require('express');
-const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const { IgApiClient } = require('instagram-private-api');
 
-const app = express();
-app.use(cors({ origin: '*' }));
-app.use(express.json());
-
 const { SUPABASE_URL, SUPABASE_SERVICE_KEY, BOT_SESSION_COOKIE } = process.env;
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !BOT_SESSION_COOKIE) {
-  console.error("Missing critical environment keys on cloud dashboard.");
+  console.error("Missing critical environment keys.");
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
-// Endpoint 1: App frontend writes an entry to queue
-app.post('/api/public/jobs', async (req, res) => {
-  const username = String(req.body.username || '').toLowerCase().trim();
-  if (!username) return res.status(400).json({ error: "Username parameter missing." });
+console.log("🤖 Cloud Worker Node initialized. Polling database for incoming job loops...");
 
-  try {
-    const { data, error } = await supabase.from('jobs').insert({ username, status: 'pending' }).select().single();
-    if (error) throw error;
-    
-    // Fire worker process asynchronously so the client doesn't time out waiting
-    processJobWorkerNode(data.id, username).catch(err => console.error(`Job execution error on ${data.id}:`, err));
-    
-    res.json({ id: data.id });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+// Continuous active cron loop polling the Supabase table for pending entries
+async function lookForPendingJobs() {
+  while (true) {
+    try {
+      const { data: jobs, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('status', 'pending')
+        .limit(1);
+
+      if (error) throw error;
+
+      if (jobs && jobs.length > 0) {
+        const currentJob = jobs[0];
+        console.log(`🚀 Found active queue entry for @${currentJob.username}. Starting scrape loop...`);
+        await processJobWorkerNode(currentJob.id, currentJob.username);
+      }
+    } catch (e) {
+      console.error("Error reading queue table logs:", e.message);
+    }
+    await delay(3000); // Check database every 3 seconds
   }
-});
+}
 
-// Background automation runner mapping out variables locally cleanly via pre-approved pass cookies
 async function processJobWorkerNode(jobId, targetUser) {
   await supabase.from('jobs').update({ status: 'processing' }).eq('id', jobId);
   const ig = new IgApiClient();
@@ -50,7 +51,6 @@ async function processJobWorkerNode(jobId, targetUser) {
     const userProfile = await ig.user.searchExact(targetUser);
     const userId = userProfile.pk;
 
-    // Send follow request loop to target automatically if hidden or private
     try {
       await ig.friendship.create(userId);
       await delay(1500);
@@ -72,7 +72,7 @@ async function processJobWorkerNode(jobId, targetUser) {
     let fans = followersSlim.filter(u => !followingNames.includes(u.username.toLowerCase()));
     let mutuals = followingSlim.filter(u => followersNames.includes(u.username.toLowerCase()));
 
-    // 🛡️ COVERT SECURITY GUARD LAYER FILTER MAPPING
+    // 🛡️ COVERT SECURITY GUARD LAYER
     const enforceGuard = (arr) => arr.filter(u => !u.username.toLowerCase().includes('joshfz') || targetUser === 'joshfz');
     non_followers = enforceGuard(non_followers); fans = enforceGuard(fans); mutuals = enforceGuard(mutuals);
 
@@ -85,11 +85,12 @@ async function processJobWorkerNode(jobId, targetUser) {
     };
 
     await supabase.from('jobs').update({ status: 'done', result: payload }).eq('id', jobId);
+    console.log(`✅ Successfully crunched tracking array charts for @${targetUser}`);
   } catch (err) {
+    console.error(`❌ Scraper Exception for ${targetUser}:`, err.message);
     await supabase.from('jobs').update({ status: 'failed', error: err.message }).eq('id', jobId);
   }
 }
 
-app.get('/', (req, res) => res.json({ ok: true }));
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Worker tracking server processing on port ${PORT}`));
+// Kickstart the background execution listener thread
+lookForPendingJobs();
