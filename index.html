@@ -65,8 +65,12 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
   const \$ = (id) => document.getElementById(id);
   const result = \$("result");
 
+  function escapeHtml(s) { 
+    return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c])); 
+  }
+
   \$("f").addEventListener("submit", async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Explicitly stop the HTML form from running a page reload reset loop
     const username = \$("u").value.trim().replace(/^@/, "").toLowerCase();
     \$("b").disabled = true;
     result.style.display = "block";
@@ -86,7 +90,7 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
       });
       
       const resData = await r.json();
-      const job = Array.isArray(resData) ? resData[0] : resData;
+      const job = Array.isArray(resData) ? resData[0] : resData; // Properly extract item from the Supabase array envelope
       if (!r.ok || !job?.id) throw new Error("Could not queue job inside database framework.");
       
       await poll(job.id, username);
@@ -109,9 +113,9 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
           headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` },
         });
         const rows = await r.json();
-        const job = Array.isArray(rows) ? rows[0] : rows;
+        const job = Array.isArray(rows) ? rows[0] : rows; // Select index 0 row smoothly
         
-        if (job?.status === "done") return render(job.result);
+        if (job?.status === "done" && job?.result) return render(job.result);
         if (job?.status === "failed") {
           result.innerHTML = `<div class="err">Scraper Exception: ${escapeHtml(job.error || "unknown error")}</div>`;
           return;
@@ -134,16 +138,16 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
     
     result.innerHTML = `
       <div class="summary">
-        <div class="stat"><div class="n">${s.followers}</div><div class="l">Followers</div></div>
-        <div class="stat"><div class="n">${s.following}</div><div class="l">Following</div></div>
-        <div class="stat"><div class="n">${s.non_followers}</div><div class="l">Don't follow back</div></div>
-        <div class="stat"><div class="n">${s.fans}</div><div class="l">Fans</div></div>
-        <div class="stat"><div class="n">${s.mutuals}</div><div class="l">Mutuals</div></div>
+        <div class="stat"><div class="n">${s.followers || 0}</div><div class="l">Followers</div></div>
+        <div class="stat"><div class="n">${s.following || 0}</div><div class="l">Following</div></div>
+        <div class="stat"><div class="n">${s.non_followers || 0}</div><div class="l">Don't follow back</div></div>
+        <div class="stat"><div class="n">${s.fans || 0}</div><div class="l">Fans</div></div>
+        <div class="stat"><div class="n">${s.mutuals || 0}</div><div class="l">Mutuals</div></div>
       </div>
       <div class="tabs">
-        <button class="tab active" id="t-non" onclick="switchTab('non')">Non-followers (${s.non_followers})</button>
-        <button class="tab" id="t-fans" onclick="switchTab('fans')">Fans (${s.fans})</button>
-        <button class="tab" id="t-mut" onclick="switchTab('mutuals')">Mutuals (${s.mutuals})</button>
+        <button class="tab active" id="t-non" onclick="switchTab('non')">Non-followers (${s.non_followers || 0})</button>
+        <button class="tab" id="t-fans" onclick="switchTab('fans')">Fans (${s.fans || 0})</button>
+        <button class="tab" id="t-mut" onclick="switchTab('mutuals')">Mutuals (${s.mutuals || 0})</button>
       </div>
       <div id="list" class="list"></div>
     `;
@@ -170,10 +174,6 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
         <a href="instagram://user?username=${escapeHtml(u.username)}" class="app-btn">View App ↗</a>
       </div>`
     ).join("") || `<div class="row"><span class="full">Empty array list context.</span></div>`;
-  }
-
-  function escapeHtml(s) { 
-    return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c])); 
   }
 </script>
 </body>
