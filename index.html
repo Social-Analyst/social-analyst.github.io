@@ -34,10 +34,13 @@ button:disabled{opacity:.5;cursor:wait}
 .tab{padding:10px 16px;background:none;border:0;color:var(--muted);cursor:pointer;font-family:inherit;font-size:14px;border-bottom:2px solid transparent}
 .tab.active{color:var(--fg);border-bottom-color:var(--p)}
 .list{max-height:400px;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px}
-.row{display:flex;justify-content:space-between;padding:8px 12px;border-radius:6px;font-size:14px}
+.row{display:flex;justify-content:space-between;padding:12px 16px;border-radius:8px;font-size:14px;align-items:center;margin-bottom:4px}
 .row:hover{background:var(--bg)}
-.row a{color:var(--fg);text-decoration:none}
-.row .full{color:var(--muted);font-size:12px}
+.row .user-meta{display:flex;flex-direction:column}
+.row .handle{font-weight:600;color:var(--fg)}
+.row .full{color:var(--muted);font-size:12px;margin-top:2px}
+.row .app-btn{background:var(--p);color:#fff;text-decoration:none;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;transition:transform 0.1s ease}
+.row .app-btn:active{transform:scale(0.96)}
 .err{color:#ff6b6b;padding:16px;background:rgba(255,107,107,.1);border-radius:12px;border:1px solid rgba(255,107,107,.3)}
 footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
 </style>
@@ -51,10 +54,102 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
     <button id="b" type="submit">Analyze</button>
   </form>
   <p class="note">Free · no login · public accounts only (or accounts our bot follows)</p>
+  
   <section id="result"></section>
 </main>
 <footer>© Social Analyst · Not affiliated with Instagram or Meta.</footer>
-<script src="config.js"></script>
-<script src="app.js"></script>
+
+<script>
+  // 🔗 CONFIGURATION: REPLACE THIS WITH YOUR LIVE RENDER URL
+  const SERVER_URL = "https://onrender.com";
+
+  const form = document.getElementById('f');
+  const input = document.getElementById('u');
+  const submitBtn = document.getElementById('b');
+  const resultSection = document.getElementById('result');
+
+  let currentData = { nonFollowers: [], mutuals: [], fans: [] };
+  let currentTab = 'non';
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const targetUser = input.value.trim().toLowerCase();
+    if(!targetUser) return;
+
+    // Show spinning status loader state
+    submitBtn.disabled = true;
+    resultSection.style.display = 'block';
+    resultSection.innerHTML = `<div class="status"><span class="spin"></span>Bot network is dispatching request to @${targetUser}... This takes roughly 30s while our cloud container processes loops.</div>`;
+
+    try {
+      const res = await fetch(`${SERVER_URL}/api/run-bot-scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUsername: targetUser })
+      });
+      const data = await res.json();
+      if(!data.success) throw new Error(data.error || 'Server parsing error.');
+
+      currentData.nonFollowers = data.nonFollowers || [];
+      currentData.mutuals = data.mutuals || [];
+      currentData.fans = data.fans || [];
+
+      renderDashboard();
+    } catch(err) {
+      resultSection.innerHTML = `<div class="err">⚠️ **Error Event**: ${err.message}. If the server timed out, please wait 30 seconds and click analyze again.</div>`;
+      submitBtn.disabled = false;
+    }
+  };
+
+  function renderDashboard() {
+    submitBtn.disabled = false;
+    resultSection.innerHTML = `
+      <div class="summary">
+        <div class="stat"><div class="n" id="c-non">${currentData.nonFollowers.length}</div><div class="l">Non-Followers</div></div>
+        <div class="stat"><div class="n" id="c-mut">${currentData.mutuals.length}</div><div class="l">Mutuals</div></div>
+        <div class="stat"><div class="n" id="c-fans">${currentData.fans.length}</div><div class="l">Fans</div></div>
+      </div>
+      <div class="tabs">
+        <button onclick="switchTab('non')" id="t-non" class="tab active">Non-Followers</button>
+        <button onclick="switchTab('mut')" id="t-mut" class="tab">Mutuals</button>
+        <button onclick="switchTab('fans')" id="t-fans" class="tab">Fans</button>
+      </div>
+      <div class="list" id="list-container"></div>
+    `;
+    renderList();
+  }
+
+  window.switchTab = function(tabName) {
+    currentTab = tabName;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(`t-${tabName === 'non' ? 'non' : tabName === 'mut' ? 'mut' : 'fans'}`).classList.add('active');
+    renderList();
+  }
+
+  function renderList() {
+    const container = document.getElementById('list-container');
+    container.innerHTML = '';
+    const activeList = currentTab === 'non' ? currentData.nonFollowers : currentTab === 'mut' ? currentData.mutuals : currentData.fans;
+
+    if(activeList.length === 0) {
+      container.innerHTML = '<div style="color:var(--muted); text-align:center; padding:30px; font-size:14px;">No profile logs inside this relationship branch loop array.</div>';
+      return;
+    }
+
+    activeList.forEach(user => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <div class="user-meta">
+          <span class="handle">@${user.username}</span>
+          <span class="full">${user.name || 'Instagram User'}</span>
+        </div>
+        <!-- 📱 NATIVE DEEP-LINK WRAPPER TO FORCIBLY OPEN PROFILES STRAIGHT INSIDE THE NATIVE APP ON PHONES -->
+        <a href="instagram://user?username=${user.username}" class="app-btn">View App ↗</a>
+      `;
+      container.appendChild(row);
+    });
+  }
+</script>
 </body>
 </html>
