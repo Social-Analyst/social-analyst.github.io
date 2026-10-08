@@ -8,18 +8,22 @@ const result = \$("result");
   \$("b").disabled = true;
   result.style.display = "block";
   result.innerHTML = `<div class="status"><span class="spin"></span> Submitting request to queue...</div>`;
+  
   try {
     const r = await fetch(`${API}/api/public/jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username }),
     });
+    
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "Submit failed");
     await poll(j.id, username);
   } catch (err) {
     result.innerHTML = `<div class="err">${escapeHtml(err.message)}</div>`;
-  } finally { \$("b").disabled = false; }
+  } finally { 
+    \$("b").disabled = false; 
+  }
 });
 
 async function poll(id, username) {
@@ -28,15 +32,23 @@ async function poll(id, username) {
   while (Date.now() - start < 5 * 60_000) {
     attempt++;
     result.innerHTML = `<div class="status"><span class="spin"></span> Bot network running analytics loop on @${escapeHtml(username)}… (${Math.round((Date.now() - start) / 1000)}s)</div>`;
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${id}&select=status,result,error`, {
-      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
-    });
-    const rows = await r.json();
-    const job = rows[0];
-    if (job?.status === "done") return render(job.result);
-    if (job?.status === "failed") {
-      result.innerHTML = `<div class="err">Scraper Exception: ${escapeHtml(job.error || "unknown error")}</div>`;
-      return;
+    
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${id}&select=status,result,error`, {
+        headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
+      });
+      const rows = await r.json();
+      
+      // CRITICAL FIX: Properly select the index 0 item from the Supabase array envelope
+      const job = Array.isArray(rows) ? rows[0] : rows;
+      
+      if (job?.status === "done") return render(job.result);
+      if (job?.status === "failed") {
+        result.innerHTML = `<div class="err">Scraper Exception: ${escapeHtml(job.error || "unknown error")}</div>`;
+        return;
+      }
+    } catch (e) {
+      console.warn("Polling retry error:", e.message);
     }
     await new Promise((r) => setTimeout(r, attempt < 5 ? 2000 : 4000));
   }
@@ -50,6 +62,7 @@ function render(data) {
     fans: data.fans || [],
     mutuals: data.mutuals || [],
   };
+  
   result.innerHTML = `
     <div class="summary">
       <div class="stat"><div class="n">${s.followers}</div><div class="l">Followers</div></div>
@@ -73,7 +86,6 @@ function render(data) {
           <span class="handle-name">@${escapeHtml(u.username)}</span>
           <span class="full">${escapeHtml(u.full_name || "Instagram Profile")}</span>
         </div>
-        <!-- 📱 NATIVE APP ROUTER LINK DEPLOYED HERE SEAMLESSLY -->
         <a href="instagram://user?username=${escapeHtml(u.username)}" class="app-btn">View App ↗</a>
       </div>`
     ).join("") || `<div class="row"><span class="full">Empty array list context.</span></div>`;
@@ -89,4 +101,6 @@ function render(data) {
   });
 }
 
-function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c])); }
+function escapeHtml(s) { 
+  return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c])); 
+}
