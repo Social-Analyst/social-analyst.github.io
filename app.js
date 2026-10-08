@@ -19,7 +19,7 @@ const result = \$("result");
     await poll(j.id, username);
   } catch (err) {
     result.innerHTML = `<div class="err">${escapeHtml(err.message)}</div>`;
-  } finaly { \$("b").disabled = false; }
+  } finally { \$("b").disabled = false; }
 });
 
 async function poll(id, username) {
