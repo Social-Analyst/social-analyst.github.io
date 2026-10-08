@@ -58,26 +58,31 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
 <footer>© Social Analyst · Not affiliated with Instagram or Meta.</footer>
 
 <script>
-  // Hardcoded direct database reference routes to remove external multi-file network dependencies
-  const SUPABASE_URL = "https://cqwtcectvjfeqskpakmt.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwiZXhwIjoyMTA2NjE2NjE2fQ.eyJhYkdjaU9pSklVekkxTmlJc0luUjVjQ0k2SWtwWFYyX3NpZF9jb29raWUiOiIyMzY5NTkwNzQxMCUzQTJodWk2aDFPWGM4VWNtJTNBMjUlM0FBWW1YVkxyU3lzMTJzTjZQNEQ5SnFTYnFRa21EX3Z4Y3VwV240aTBTMGcifQ"; 
-  
+  // ==========================================
+  // 🔑 CONFIGURATION SECTION (FILL THESE OUT MANUALLY)
+  // ==========================================
+  const SUPABASE_URL = "https://supabase.co";
+  const SUPABASE_ANON = "PASTE_YOUR_ANON_PUBLIC_KEY_HERE"; 
+  // ==========================================
+
+  // Global UI Targeting Bindings
   const \$ = (id) => document.getElementById(id);
   const result = \$("result");
 
+  // Global HTML Sanitization Core Function
   function escapeHtml(s) { 
     return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c])); 
   }
 
   \$("f").addEventListener("submit", async (e) => {
-    e.preventDefault(); // Explicitly stop the HTML form from running a page reload reset loop
+    e.preventDefault(); // Lock the HTML form to prevent automated page reloads
     const username = \$("u").value.trim().replace(/^@/, "").toLowerCase();
     \$("b").disabled = true;
     result.style.display = "block";
     result.innerHTML = `<div class="status"><span class="spin"></span> Dropping request into bot queue...</div>`;
     
     try {
-      // 🚀 WRITING DIRECTLY TO SUPABASE PIPELINE GATEWAYS
+      // Send the request directly to the Supabase REST pipeline
       const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
         method: "POST",
         headers: { 
@@ -90,8 +95,9 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
       });
       
       const resData = await r.json();
-      const job = Array.isArray(resData) ? resData[0] : resData; // Properly extract item from the Supabase array envelope
-      if (!r.ok || !job?.id) throw new Error("Could not queue job inside database framework.");
+      const job = Array.isArray(resData) ? resData[0] : resData;
+      
+      if (!r.ok || !job?.id) throw new Error("Could not log job inside the database queue container.");
       
       await poll(job.id, username);
     } catch (err) {
@@ -113,7 +119,7 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
           headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` },
         });
         const rows = await r.json();
-        const job = Array.isArray(rows) ? rows[0] : rows; // Select index 0 row smoothly
+        const job = Array.isArray(rows) ? rows[0] : rows;
         
         if (job?.status === "done" && job?.result) return render(job.result);
         if (job?.status === "failed") {
@@ -121,7 +127,7 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
           return;
         }
       } catch (e) {
-        console.warn("Retrying database poll...");
+        console.warn("Retrying database connection check loop...");
       }
       await new Promise((r) => setTimeout(r, attempt < 5 ? 2000 : 4000));
     }
@@ -171,6 +177,7 @@ footer{text-align:center;padding:30px;color:var(--muted);font-size:12px}
           <span class="handle">@${escapeHtml(u.username)}</span>
           <span class="full">${escapeHtml(u.full_name || "Instagram Profile")}</span>
         </div>
+        <!-- 📱 MOBILE DEEP-LINK APP ROUTER ROUTE -->
         <a href="instagram://user?username=${escapeHtml(u.username)}" class="app-btn">View App ↗</a>
       </div>`
     ).join("") || `<div class="row"><span class="full">Empty array list context.</span></div>`;
