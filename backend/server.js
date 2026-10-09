@@ -140,6 +140,8 @@ async function initClient(rawCookie, botUsername) {
 
   // 1) device first, 2) then the cookie jar — avoids the init race conditions.
   ig.state.generateDevice(botUsername || `u${userId}`);
+  // Optional: route Instagram traffic through a (residential) proxy, e.g. http://user:pass@host:port
+  if (process.env.IG_PROXY_URL) ig.state.proxyUrl = process.env.IG_PROXY_URL;
   await ig.state.deserializeCookieJar(JSON.stringify(serialized));
   return ig;
 }
@@ -263,8 +265,16 @@ async function runJob(job) {
     await processJob(job);
   } catch (err) {
     console.error(`Job ${job.id} failed:`, err && err.message ? err.message : err);
+    if (err && err.response) {
+      console.error('  HTTP status:', err.response.statusCode);
+      try { console.error('  Response body:', JSON.stringify(err.response.body).slice(0, 800)); } catch (_) {}
+    }
     let message = 'Analysis failed. Please try again in a moment.';
     if (err instanceof UserError) message = err.message;
+    else if (/accounts\/current_user/.test(String(err && err.message))) {
+      clientPromise = null; // force a fresh session init on the next job
+      message = 'The analyzer account session was rejected. Please try again later.';
+    }
     else if (err instanceof IgLoginRequiredError || err instanceof IgCheckpointError) {
       clientPromise = null; // force a fresh init on the next job
       message = 'The analyzer account needs attention. Please try again later.';
