@@ -259,23 +259,41 @@ function isConfigured() {
   return SUPABASE_ANON.indexOf('PASTE_YOUR') === -1 && SUPABASE_URL.indexOf('YOUR-PROJECT-REF') === -1;
 }
 async function queueJob(username) {
-  var id = uuid();
+  // Generate a valid cryptographic UUID locally to pass strict database parameters cleanly
+  var id = typeof crypto.randomUUID === 'function' 
+    ? crypto.randomUUID() 
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+
   var res = await fetch(SUPABASE_URL + '/rest/v1/jobs', {
     method: 'POST',
     headers: Object.assign({ Prefer: 'return=minimal' }, HEADERS),
-    body: JSON.stringify({ id: id, username: username })
+    body: JSON.stringify({ id: id, username: username, status: 'pending' })
   });
+  
   if (!res.ok) throw new Error('Could not queue your request (' + res.status + ').');
   return id;
 }
+
 async function fetchJob(id) {
-  var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/get_job', {
-    method: 'POST', headers: HEADERS, body: JSON.stringify({ p_id: id })
+  var res = await fetch(SUPABASE_URL + '/rpc/get_job', {
+    method: 'POST', 
+    headers: HEADERS, 
+    body: JSON.stringify({ p_id: id })
   });
+  
   if (!res.ok) throw new Error('poll ' + res.status);
   var rows = await res.json();
-  return Array.isArray(rows) ? rows[0] : rows;
+  
+  // Unpack array collection payloads returned by secure rpc functions safely
+  if (Array.isArray(rows)) {
+    return rows.length > 0 ? rows[0] : null;
+  }
+  return rows;
 }
+
 
 // ---------- polling ----------
 function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } }
