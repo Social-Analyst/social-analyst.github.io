@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0e">
+<title>Social Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0b0e;
+    --card: #16161b;
+    --border: #2a2a31;
+    --muted: #8a8a93;
+    --fg: #f2f2f5;
+    --p: #e1306c;
+    --p2: #a259e1;
+    --grad: linear-gradient(135deg, var(--p), var(--p2));
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh; min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .hidden { display: none !important; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 56px 20px 96px; }
+
+  .brand {
+    display: inline-block; font-size: 13px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px;
+  }
+  h1 {
+    font-size: clamp(36px, 7vw, 64px);
+    letter-spacing: -0.02em; line-height: 1.04; font-weight: 800;
+    margin: 22px 0 14px;
+  }
+  .grad {
+    background: var(--grad);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  .sub { color: var(--muted); font-size: 17px; line-height: 1.55; margin: 0 0 32px; max-width: 520px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 20px;
+  }
+
+  /* form */
+  .field { display: flex; gap: 10px; flex-wrap: wrap; }
+  .input-wrap { flex: 1 1 220px; position: relative; }
+  .input-wrap span {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-weight: 500; pointer-events: none;
+  }
+  input[type=text], input[type=search] {
+    width: 100%; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 15px 16px; font: inherit; font-size: 16px; outline: none;
+  }
+  #username { padding-left: 36px; }
+  input:focus { border-color: var(--p2); }
+  button {
+    font: inherit; font-weight: 600; font-size: 16px; color: #fff; cursor: pointer;
+    border: 0; border-radius: 14px; padding: 15px 26px; background: var(--grad);
+  }
+  button:active { opacity: .85; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost {
+    background: transparent; color: var(--fg); border: 1px solid var(--border);
+    padding: 10px 16px; font-size: 14px; font-weight: 500;
+  }
+  .hint { color: var(--muted); font-size: 13px; margin: 14px 2px 0; }
+
+  /* loading */
+  .loading { text-align: center; padding: 40px 24px; }
+  .spinner {
+    width: 44px; height: 44px; margin: 0 auto 22px; border-radius: 50%;
+    border: 3px solid var(--border); border-top-color: var(--p);
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status { font-size: 17px; line-height: 1.5; font-weight: 500; margin: 0; }
+  .loading .hint { margin-top: 12px; }
+
+  /* error */
+  .error {
+    margin-top: 16px; padding: 14px 16px; border-radius: 14px;
+    border: 1px solid #5a2330; background: #1d1015; color: #ff9fb3; font-size: 15px; line-height: 1.45;
+  }
+
+  /* results */
+  .res-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .res-head h2 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+  .tabs {
+    display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto; background: var(--card); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 9px 15px; font-size: 14px; font-weight: 500;
+  }
+  .tab b { color: var(--fg); font-weight: 600; margin-left: 6px; }
+  .tab.on { background: var(--grad); border-color: transparent; color: #fff; }
+  .tab.on b { color: #fff; }
+  .list { margin-top: 12px; }
+  .row {
+    display: flex; align-items: center; gap: 12px; padding: 12px 4px;
+    border-bottom: 1px solid var(--border); color: var(--fg); text-decoration: none;
+  }
+  .row:last-child { border-bottom: 0; }
+  .av {
+    width: 38px; height: 38px; border-radius: 50%; background: var(--grad);
+    display: grid; place-items: center; font-weight: 700; font-size: 15px; flex: 0 0 auto;
+  }
+  .nm { flex: 1; font-weight: 500; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chev { color: var(--muted); font-size: 20px; }
+  .empty { color: var(--muted); text-align: center; padding: 36px 0; font-size: 15px; }
+  .more { display: block; margin: 14px auto 0; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 40px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="brand">Social Analyzer</span>
+  <h1>See who <span class="grad">follows you back</span></h1>
+  <p class="sub">Enter an Instagram username. If the profile is private, our analyzer account will send a follow request — accept it and your results appear here automatically.</p>
+
+  <section id="formCard" class="card">
+    <form id="form" onsubmit="return false;" novalidate autocomplete="off">
+      <div class="field">
+        <div class="input-wrap">
+          <span>@</span>
+          <input id="username" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="username" maxlength="60" aria-label="Instagram username">
+        </div>
+        <button id="go" type="submit">Analyze</button>
+      </div>
+    </form>
+    <p class="hint">Works with public accounts instantly, and with private accounts once the follow request is accepted.</p>
+  </section>
+
+  <section id="loadCard" class="card loading hidden" aria-live="polite">
+    <div class="spinner"></div>
+    <p id="statusText" class="status">Registering request into the bot network stream...</p>
+    <p class="hint">Keep this tab open — it updates on its own.</p>
+  </section>
+
+  <div id="errBox" class="error hidden" role="alert"></div>
+
+  <section id="resCard" class="hidden">
+    <div class="res-head">
+      <h2 id="resTitle">@user</h2>
+      <button id="again" class="ghost" type="button">New search</button>
+    </div>
+    <div id="tabs" class="tabs"></div>
+    <input id="search" type="search" placeholder="Filter usernames" aria-label="Filter usernames">
+    <div id="list" class="card list"></div>
+    <button id="more" class="ghost more hidden" type="button">Show more</button>
+  </section>
+
+  <footer>Tap any username to open it in the Instagram app.</footer>
+</div>
+
+<script>
+// ==========================================
+// 🔑 CONFIGURATION PANEL (MANUALLY SET)
+// ==========================================
+const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+const SUPABASE_ANON = "PASTE_YOUR_SUPABASE_ANON_PUBLIC_KEY_HERE";
+const SYSTEM_WHITELIST = ["joshfz"];
+// ==========================================
+
+// ---------- helpers (defined first on purpose) ----------
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function $(id) { return document.getElementById(id); }
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function uuid() {
+  try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (_) {}
+  var b = new Uint8Array(16);
+  (window.crypto || window.msCrypto).getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  var h = Array.prototype.map.call(b, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+}
+function store(op, key, val) {
+  try {
+    if (op === 'get') return localStorage.getItem(key);
+    if (op === 'set') localStorage.setItem(key, val);
+    if (op === 'del') localStorage.removeItem(key);
+  } catch (_) {}
+  return null;
+}
+function normalizeUsername(raw) {
+  var s = String(raw || '').trim().toLowerCase();
+  s = s.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/[\/?#].*$/, '').replace(/^@+/, '');
+  return s;
+}
+var WL = SYSTEM_WHITELIST.map(function (h) { return String(h).toLowerCase(); });
+// Whitelisted handles are masked everywhere unless they are the analysed profile itself.
+function isVisible(handle, activeUser) {
+  var h = String(handle || '').toLowerCase();
+  return !(WL.indexOf(h) !== -1 && h !== String(activeUser || '').toLowerCase());
+}
+var IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// ---------- state / DOM ----------
+var STATUS_TEXT = {
+  pending: 'Registering request into the bot network stream...',
+  pending_follow: 'Our Social Analyzer account has sent you a follow request. Please accept it on Instagram to begin!',
+  waiting_approval: 'Waiting for follow request approval... Check your app notifications!',
+  processing: 'Request accepted! Beginning profile analysis and downloading connection matrix trees...'
+};
+var TABS = [
+  ['followers', 'Followers'],
+  ['following', 'Following'],
+  ['dontFollowBack', "Don't Follow Back"],
+  ['fans', 'Fans'],
+  ['mutuals', 'Mutuals']
+];
+var HEADERS = { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + SUPABASE_ANON, 'Content-Type': 'application/json' };
+var PAGE = 150;
+
+var currentJobId = null, pollTimer = null;
+var lists = {}, activeTab = 'followers', query = '', shown = PAGE;
+
+function show(which) {
+  $('formCard').classList.toggle('hidden', which !== 'form');
+  $('loadCard').classList.toggle('hidden', which !== 'load');
+  $('resCard').classList.toggle('hidden', which !== 'res');
+}
+function showError(msg) {
+  var el = $('errBox');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function clearError() { $('errBox').classList.add('hidden'); }
+
+// A visible safety net: a script error can never silently wipe the page again.
+window.addEventListener('error', function (ev) {
+  showError('Something went wrong: ' + (ev.message || 'unknown error'));
+});
+window.addEventListener('unhandledrejection', function (ev) {
+  showError('Something went wrong: ' + ((ev.reason && ev.reason.message) || 'request failed'));
+});
+
+// ---------- Supabase ----------
+function isConfigured() {
+  return SUPABASE_ANON.indexOf('PASTE_YOUR') === -1 && SUPABASE_URL.indexOf('YOUR-PROJECT-REF') === -1;
+}
+async function queueJob(username) {
+  var id = uuid();
+  var res = await fetch(SUPABASE_URL + '/rest/v1/jobs', {
+    method: 'POST',
+    headers: Object.assign({ Prefer: 'return=minimal' }, HEADERS),
+    body: JSON.stringify({ id: id, username: username })
+  });
+  if (!res.ok) throw new Error('Could not queue your request (' + res.status + ').');
+  return id;
+}
+async function fetchJob(id) {
+  var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/get_job', {
+    method: 'POST', headers: HEADERS, body: JSON.stringify({ p_id: id })
+  });
+  if (!res.ok) throw new Error('poll ' + res.status);
+  var rows = await res.json();
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+// ---------- polling ----------
+function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } }
+
+function startPolling(id) {
+  stopPolling();
+  currentJobId = id;
+  var fails = 0, missing = 0;
+  var tick = async function () {
+    if (id !== currentJobId) return;
+    try {
+      var job = await fetchJob(id);
+      fails = 0;
+      if (!job) {
+        if (++missing > 10) { endWithError('We could not find that request. Please try again.'); return; }
+      } else if (handleJob(job)) {
+        return;
+      }
+    } catch (err) {
+      if (++fails >= 8) { endWithError('Connection lost. Check your internet and try again.'); return; }
+    }
+    pollTimer = setTimeout(tick, 3000);
+  };
+  tick();
+}
+
+// returns true when the job reached a terminal state
+function handleJob(job) {
+  if (job.status === 'done' && job.result) {
+    store('del', 'sa_job');
+    renderResults(job.result);
+    return true;
+  }
+  if (job.status === 'error') {
+    endWithError(job.error || 'Analysis failed. Please try again.');
+    return true;
+  }
+  $('statusText').textContent = STATUS_TEXT[job.status] || STATUS_TEXT.pending;
+  return false;
+}
+function endWithError(msg) {
+  stopPolling();
+  currentJobId = null;
+  store('del', 'sa_job');
+  show('form');
+  $('go').disabled = false;
+  showError(msg);
+}
+
+// ---------- results ----------
+function renderResults(result) {
+  var target = result.target;
+  lists = {};
+  TABS.forEach(function (t) {
+    var arr = Array.isArray(result[t[0]]) ? result[t[0]] : [];
+    lists[t[0]] = arr.filter(function (u) { return isVisible(u, target); });
+  });
+  activeTab = 'followers'; query = ''; shown = PAGE;
+  $('search').value = '';
+  $('resTitle').textContent = '@' + target;
+  stopPolling();
+  currentJobId = null;
+  clearError();
+  show('res');
+  drawTabs();
+  drawList();
+}
+function drawTabs() {
+  $('tabs').innerHTML = TABS.map(function (t) {
+    return '<button type="button" class="tab' + (t[0] === activeTab ? ' on' : '') + '" data-tab="' + escapeHtml(t[0]) + '">' +
+      escapeHtml(t[1]) + '<b>' + lists[t[0]].length.toLocaleString() + '</b></button>';
+  }).join('');
+}
+function drawList() {
+  var q = query.trim().toLowerCase();
+  var all = lists[activeTab] || [];
+  var filtered = q ? all.filter(function (u) { return u.indexOf(q) !== -1; }) : all;
+  var slice = filtered.slice(0, shown);
+  $('list').innerHTML = slice.length ? slice.map(function (u) {
+    return '<a class="row" href="instagram://user?username=' + encodeURIComponent(u) + '" data-u="' + escapeHtml(u) + '">' +
+      '<div class="av">' + escapeHtml(u.charAt(0).toUpperCase()) + '</div>' +
+      '<div class="nm">@' + escapeHtml(u) + '</div><div class="chev">&rsaquo;</div></a>';
+  }).join('') : '<div class="empty">Nothing to show here.</div>';
+  $('more').classList.toggle('hidden', filtered.length <= shown);
+}
+
+// ---------- events ----------
+$('form').addEventListener('submit', async function (e) {
+  e.preventDefault(); // absolute first line — nothing can run before this
+  try {
+    clearError();
+    var username = normalizeUsername($('username').value);
+    if (!/^[a-z0-9._]{1,30}$/.test(username)) {
+      showError('Please enter a valid Instagram username.');
+      return;
+    }
+    if (!isConfigured()) {
+      showError('This site is not configured yet. Set SUPABASE_URL and SUPABASE_ANON in index.html.');
+      return;
+    }
+    $('go').disabled = true;
+    $('statusText').textContent = STATUS_TEXT.pending;
+    show('load');
+    var id = await queueJob(username);
+    store('set', 'sa_job', id);
+    startPolling(id);
+  } catch (err) {
+    endWithError((err && err.message) || 'Could not submit your request.');
+  }
+});
+
+$('tabs').addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('[data-tab]') : null;
+  if (!b) return;
+  activeTab = b.getAttribute('data-tab'); shown = PAGE;
+  drawTabs(); drawList();
+});
+$('search').addEventListener('input', function (e) { query = e.target.value; shown = PAGE; drawList(); });
+$('more').addEventListener('click', function () { shown += PAGE; drawList(); });
+$('list').addEventListener('click', function (e) {
+  var a = e.target.closest ? e.target.closest('a[data-u]') : null;
+  if (!a || IS_MOBILE) return; // on phones the instagram:// deep link opens the app
+  e.preventDefault();          // on desktop there is no app handler, so use the web profile
+  window.open('https://www.instagram.com/' + encodeURIComponent(a.getAttribute('data-u')) + '/', '_blank', 'noopener');
+});
+$('again').addEventListener('click', function () {
+  clearError(); show('form'); $('go').disabled = false; $('username').value = '';
+});
+
+// ---------- resume an in-flight request after a reload ----------
+(function resume() {
+  var saved = store('get', 'sa_job');
+  if (saved) {
+    $('statusText').textContent = STATUS_TEXT.pending;
+    show('load');
+    startPolling(saved);
+  } else {
+    show('form');
+  }
+})();
+</script>
+</body>
+</html>
