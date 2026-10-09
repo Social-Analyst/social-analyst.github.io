@@ -87,9 +87,7 @@ async function pollJobs() {
     ig.state.appVersion = '315.0.0.33.109';
     ig.state.userAgent = 'Instagram 315.0.0.33.109 Android (29/10; 480dpi; 1080x2280; OnePlus; ONEPLUS A6003; enchilada; qcom; en_US; 564998083)';
 
-    // 2. 🔓 THE BULLETPROOF INJECTION ROUTINE: 
-    // We let the library build its own native, compiled cookie jar infrastructure first on state generation,
-    // then cleanly inject your raw session string directly into that live runtime jar instance.
+    // 2. 🔓 DIRECT COOKIE JAR INJECTION ROUTINE
     const cookieString = `sessionid=${process.env.BOT_SESSION_COOKIE.trim()}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
     await ig.request.jar.setCookie(cookieString, 'https://instagram.com');
 
