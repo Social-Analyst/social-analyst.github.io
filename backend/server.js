@@ -1,95 +1,198 @@
+const SYSTEM_WHITELIST = ["joshfz"];
+
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const { IgApiClient } = require('instagram-private-api');
 
 const app = express();
-app.use(cors({ origin: '*' }));
+app.use(cors());
 app.use(express.json());
 
-const { SUPABASE_URL, SUPABASE_SERVICE_KEY, BOT_SESSION_COOKIE } = process.env;
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !BOT_SESSION_COOKIE) {
-  console.error("Missing critical environment keys on cloud dashboard.");
-  process.exit(1);
-}
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://supabase.co";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "PASTE_YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-const delay = (ms) => new Promise(r => setTimeout(r, ms));
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Endpoint 1: App frontend writes an entry to queue
-app.post('/api/public/jobs', async (req, res) => {
-  const username = String(req.body.username || '').toLowerCase().trim();
-  if (!username) return res.status(400).json({ error: "Username parameter missing." });
-
-  try {
-    const { data, error } = await supabase.from('jobs').insert({ username, status: 'pending' }).select().single();
-    if (error) throw error;
-    
-    // Fire worker process asynchronously so the client doesn't time out waiting
-    processJobWorkerNode(data.id, username).catch(err => console.error(`Job execution error on ${data.id}:`, err));
-    
-    res.json({ id: data.id });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// Health check endpoint for Render backend worker
+app.get('/', (req, res) => {
+  res.json({ ok: true });
 });
 
-// Background automation runner mapping out variables locally cleanly via pre-approved pass cookies
-async function processJobWorkerNode(jobId, targetUser) {
-  await supabase.from('jobs').update({ status: 'processing' }).eq('id', jobId);
-  const ig = new IgApiClient();
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
+});
+
+// Helper: Filter user list with Whitelist Exclusion Mask
+function isUserWhitelisted(handle) {
+  if (!handle) return false;
+  const lower = handle.toLowerCase();
+  return SYSTEM_WHITELIST.some(item => item.toLowerCase() === lower);
+}
+
+function filterUserList(userList, activeUsername) {
+  if (!Array.isArray(userList)) return [];
+  const activeLower = (activeUsername || '').toLowerCase();
+
+  return userList.filter(user => {
+    const handle = typeof user === 'string' ? user : (user.username || '');
+    if (!handle) return false;
+
+    if (isUserWhitelisted(handle)) {
+      // Exception: Whitelisted handle is ONLY permitted if it matches active profile running the sync
+      return handle.toLowerCase() === activeLower;
+    }
+    return true;
+  });
+}
+
+// Background Worker Loop
+let isProcessing = false;
+
+async function pollJobs() {
+  if (isProcessing) return;
 
   try {
-    await ig.state.deserialize({
-      cookies: [{ key: 'sessionid', value: BOT_SESSION_COOKIE, domain: 'instagram.com', path: '/' }],
-      userAgent: 'Instagram 315.0.0.33.109 Android (29/10; 480dpi; 1080x2280; OnePlus; ONEPLUS A6003)'
-    });
-    ig.state.appVersion = '315.0.0.33.109';
-    ig.state.userAgent = 'Instagram 315.0.0.33.109 Android (29/10; 480dpi; 1080x2280; OnePlus; ONEPLUS A6003; enchilada; qcom; en_US; 564998083)';
+    // 1. Fetch pending job
+    const { data: jobs, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(1);
 
-    const userProfile = await ig.user.searchExact(targetUser);
-    const userId = userProfile.pk;
+    if (error) {
+      console.error('Error fetching pending jobs:', error.message);
+      return;
+    }
 
-    // Send follow request loop to target automatically if hidden or private
+    if (!jobs || jobs.length === 0) {
+      return;
+    }
+
+    const currentJob = jobs[0];
+    isProcessing = true;
+
+    console.log(`Processing job ${currentJob.id} for user @${currentJob.username}`);
+
+    // 2. Mark as processing
+    await supabase
+      .from('jobs')
+      .update({ status: 'processing' })
+      .eq('id', currentJob.id);
+
+    // 3. Execute Instagram API processing
+    const activeUsername = currentJob.username;
+    const botSessionCookie = process.env.BOT_SESSION_COOKIE;
+
+    const ig = new IgApiClient();
+
+    if (botSessionCookie) {
+      try {
+        await ig.state.deserializeCookieJar(botSessionCookie);
+      } catch (e) {
+        console.warn('Could not deserialize BOT_SESSION_COOKIE jar directly:', e.message);
+      }
+    }
+
+    // Accept pending connection requests if method exists
     try {
-      await ig.friendship.create(userId);
-      await delay(1500);
-    } catch (_) {}
+      const pendingRequests = await ig.friendship.pendingRequests();
+      if (pendingRequests && pendingRequests.users) {
+        for (const user of pendingRequests.users) {
+          await ig.friendship.approve(user.pk);
+        }
+      }
+    } catch (e) {
+      // Non-fatal if pending requests check fails
+      console.log('Pending requests check skipped/failed:', e.message);
+    }
 
-    const followingFeed = ig.feed.accountFollowing(userId);
-    const followersFeed = ig.feed.accountFollowers(userId);
+    // Resolve target user PK
+    const targetPk = await ig.user.getIdByUsername(activeUsername);
 
-    const following = await followingFeed.all();
-    const followers = await followersFeed.all();
+    // Fetch Followers
+    const followersFeed = ig.feed.accountFollowers(targetPk);
+    const followersItems = await followersFeed.items();
+    const followersUsernames = followersItems.map(item => item.username);
 
-    const followingSlim = following.map(u => ({ username: u.username, full_name: u.full_name }));
-    const followersSlim = followers.map(u => ({ username: u.username, full_name: u.full_name }));
+    // Fetch Following
+    const followingFeed = ig.feed.accountFollowing(targetPk);
+    const followingItems = await followingFeed.items();
+    const followingUsernames = followingItems.map(item => item.username);
 
-    const followingNames = following.map(u => u.username.toLowerCase());
-    const followersNames = followers.map(u => u.username.toLowerCase());
+    const followersSet = new Set(followersUsernames.map(u => u.toLowerCase()));
+    const followingSet = new Set(followingUsernames.map(u => u.toLowerCase()));
 
-    let non_followers = followingSlim.filter(u => !followersNames.includes(u.username.toLowerCase()));
-    let fans = followersSlim.filter(u => !followingNames.includes(u.username.toLowerCase()));
-    let mutuals = followingSlim.filter(u => followersNames.includes(u.username.toLowerCase()));
+    // Relational calculations
+    // Non-followers: users target is following, but who don't follow back
+    const rawNonFollowers = followingUsernames.filter(u => !followersSet.has(u.toLowerCase()));
 
-    // 🛡️ COVERT SECURITY GUARD LAYER FILTER MAPPING
-    const enforceGuard = (arr) => arr.filter(u => !u.username.toLowerCase().includes('joshfz') || targetUser === 'joshfz');
-    non_followers = enforceGuard(non_followers); fans = enforceGuard(fans); mutuals = enforceGuard(mutuals);
+    // Mutuals: users target is following who also follow back
+    const rawMutuals = followingUsernames.filter(u => followersSet.has(u.toLowerCase()));
 
-    const payload = {
-      summary: {
-        followers: followers.length, following: following.length,
-        non_followers: non_followers.length, fans: fans.length, mutuals: mutuals.length
+    // Fans: users following target, but target doesn't follow back
+    const rawFans = followersUsernames.filter(u => !followingSet.has(u.toLowerCase()));
+
+    // Apply strict whitelist exclusion rules
+    const filteredNonFollowers = filterUserList(rawNonFollowers, activeUsername);
+    const filteredMutuals = filterUserList(rawMutuals, activeUsername);
+    const filteredFans = filterUserList(rawFans, activeUsername);
+
+    const resultPayload = {
+      non_followers: filteredNonFollowers,
+      mutuals: filteredMutuals,
+      fans: filteredFans,
+      counts: {
+        non_followers: filteredNonFollowers.length,
+        mutuals: filteredMutuals.length,
+        fans: filteredFans.length
       },
-      non_followers, fans, mutuals
+      updated_at: new Date().toISOString()
     };
 
-    await supabase.from('jobs').update({ status: 'done', result: payload }).eq('id', jobId);
+    // 4. Mark job as done and update result payload
+    await supabase
+      .from('jobs')
+      .update({
+        status: 'done',
+        result: resultPayload
+      })
+      .eq('id', currentJob.id);
+
+    console.log(`Successfully completed job ${currentJob.id} for @${activeUsername}`);
+
   } catch (err) {
-    await supabase.from('jobs').update({ status: 'failed', error: err.message }).eq('id', jobId);
+    console.error('Error processing job:', err);
+    // Attempt to record failure on current job if error occurred
+    try {
+      const { data: jobs } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('status', 'processing')
+        .limit(1);
+
+      if (jobs && jobs.length > 0) {
+        await supabase
+          .from('jobs')
+          .update({
+            status: 'error',
+            error: err.message || 'Error occurred during Instagram data analysis.'
+          })
+          .eq('id', jobs[0].id);
+      }
+    } catch (e) {
+      console.error('Failed to set error status on job:', e.message);
+    }
+  } finally {
+    isProcessing = false;
   }
 }
 
-app.get('/', (req, res) => res.json({ ok: true }));
+// Poll every 3 seconds
+setInterval(pollJobs, 3000);
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Worker tracking server processing on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Social Analyzer worker listening on port ${PORT}`);
+});
