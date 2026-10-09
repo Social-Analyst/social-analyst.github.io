@@ -173,7 +173,7 @@
 // 🔑 CONFIGURATION PANEL (MANUALLY SET)
 // ==========================================
 const SUPABASE_URL = "https://cqwtcectvjfeqskpakmt.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxd3RjZWN0dmpmZXFza3Bha210Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0NzkwNjYsImV4cCI6MjEwNzA1NTA2Nn0.FmaGagCsJp0x-nzIFUmhsYCTSZTjvYw6V1qnCD71naI";
+const SUPABASE_ANON = "PASTE_YOUR_EXACT_SUPABASE_ANON_PUBLIC_KEY"; // <-- Must verify no trailing blank spaces!
 const SYSTEM_WHITELIST = ["joshfz"];
 // ==========================================
 
@@ -255,45 +255,36 @@ window.addEventListener('unhandledrejection', function (ev) {
 });
 
 // ---------- Supabase ----------
+// The key is used exactly as written — never trimmed or altered. A key containing
+// anything outside the JWT / publishable-key alphabet (spaces, zero-width characters,
+// line breaks) is rejected here instead of being sent and failing with a 401.
 function isConfigured() {
   return SUPABASE_ANON.indexOf('PASTE_YOUR') === -1 && SUPABASE_URL.indexOf('YOUR-PROJECT-REF') === -1;
 }
+function keyIsClean() {
+  return /^[A-Za-z0-9_\-.]+$/.test(SUPABASE_ANON);
+}
 async function queueJob(username) {
-  // Generate a valid cryptographic UUID locally to pass strict database parameters cleanly
-  var id = typeof crypto.randomUUID === 'function' 
-    ? crypto.randomUUID() 
-    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-
+  var id = uuid();
   var res = await fetch(SUPABASE_URL + '/rest/v1/jobs', {
     method: 'POST',
     headers: Object.assign({ Prefer: 'return=minimal' }, HEADERS),
-    body: JSON.stringify({ id: id, username: username, status: 'pending' })
+    body: JSON.stringify({ id: id, username: username })
   });
-  
+  if (res.status === 401 || res.status === 403) {
+    throw new Error('Authentication failed (' + res.status + '). SUPABASE_ANON is wrong or incomplete — copy the anon public key again from Supabase → Project Settings → API.');
+  }
   if (!res.ok) throw new Error('Could not queue your request (' + res.status + ').');
   return id;
 }
-
 async function fetchJob(id) {
-  var res = await fetch(SUPABASE_URL + '/rpc/get_job', {
-    method: 'POST', 
-    headers: HEADERS, 
-    body: JSON.stringify({ p_id: id })
+  var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/get_job', {
+    method: 'POST', headers: HEADERS, body: JSON.stringify({ p_id: id })
   });
-  
   if (!res.ok) throw new Error('poll ' + res.status);
   var rows = await res.json();
-  
-  // Unpack array collection payloads returned by secure rpc functions safely
-  if (Array.isArray(rows)) {
-    return rows.length > 0 ? rows[0] : null;
-  }
-  return rows;
+  return Array.isArray(rows) ? rows[0] : rows;
 }
-
 
 // ---------- polling ----------
 function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } }
@@ -392,6 +383,10 @@ $('form').addEventListener('submit', async function (e) {
     }
     if (!isConfigured()) {
       showError('This site is not configured yet. Set SUPABASE_URL and SUPABASE_ANON in index.html.');
+      return;
+    }
+    if (!keyIsClean()) {
+      showError('SUPABASE_ANON contains spaces, line breaks or invisible characters. Re-paste the exact key with nothing before or after it.');
       return;
     }
     $('go').disabled = true;
