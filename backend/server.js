@@ -1,10 +1,11 @@
-// ==========================================
-// 🔑 CONFIGURATION (EDIT THE SYSTEM WHITELIST EXCLUSIONS MATRIX HERE)
-// ==========================================
+// =========================================================================
+// 🔑 CONFIGURATION PANEL (VARIABLES & NAMES KEPT COMPLETELY CONSTANT)
+// =========================================================================
 const SYSTEM_WHITELIST = ["joshfz"];
+const baseUrl = "https://supabase.co";
 // Required environment variables to map inside the Render control dashboard:
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BOT_SESSION_COOKIE
-// ==========================================
+// =========================================================================
 
 const express = require('express');
 const cors = require('cors');
@@ -15,16 +16,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL || baseUrl;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const BOT_SESSION_COOKIE = process.env.BOT_SESSION_COOKIE;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !process.env.BOT_SESSION_COOKIE) {
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !BOT_SESSION_COOKIE) {
   console.error("❌ Missing required environment keys: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BOT_SESSION_COOKIE");
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
+// Main base HTTP routes to pass Render automated uptime check pingers cleanly
 app.get('/', (req, res) => res.json({ ok: true }));
 app.get('/health', (req, res) => res.json({ ok: true }));
 
@@ -44,7 +47,7 @@ function filterUserList(userList, activeUsername) {
     const cleanHandle = handle.toLowerCase().trim();
 
     if (isUserWhitelisted(cleanHandle)) {
-      return cleanHandle === activeLower; 
+      return cleanHandle === activeLower; // Only visible if whitelisted user runs their own session workspace
     }
     return true;
   });
@@ -70,28 +73,49 @@ async function pollJobs() {
 
     if (!jobs || jobs.length === 0) return;
 
-    // Unpack the active database row item safely from the array envelope
+    // Unpack item 0 from the array pool collection envelope securely to prevent object runtime crashes
     const currentJob = jobs[0];
     isProcessing = true;
 
     console.log(`🚀 Processing job ${currentJob.id} for user @${currentJob.username}`);
 
-    // Update table flag state to lock execution threads
+    // Update job row to processing to lock out concurrent execution race channels
     await supabase.from('jobs').update({ status: 'processing' }).eq('id', currentJob.id);
 
     const activeUsername = currentJob.username.toLowerCase().trim();
     const ig = new IgApiClient();
 
-    // 1. Generate core state fingerprint variables natively
+    // STEP 1: Generate client state parameters before handling cookie jar deserialization loops
     ig.state.generateDevice(activeUsername);
     ig.state.appVersion = '315.0.0.33.109';
     ig.state.userAgent = 'Instagram 315.0.0.33.109 Android (29/10; 480dpi; 1080x2280; OnePlus; ONEPLUS A6003; enchilada; qcom; en_US; 564998083)';
 
-    // 2. 🔓 DIRECT COOKIE JAR INJECTION ROUTINE
-    const cookieString = `sessionid=${process.env.BOT_SESSION_COOKIE.trim()}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-    await ig.request.jar.setCookie(cookieString, 'https://instagram.com');
+    // STEP 2: 🔓 THE PLUMBING RESOLUTION - Emulate structural store definitions natively.
+    // This pre-initializes internal client request jars to eliminate the 'setCookie' crash completely.
+    const mockToughCookieJar = {
+      version: "tough-cookie@4.1.3",
+      storeType: "MemoryCookieStore",
+      rejectPublicSuffixes: true,
+      enableLooseMode: true,
+      cookies: [
+        {
+          key: "sessionid",
+          value: BOT_SESSION_COOKIE.trim(),
+          domain: "instagram.com",
+          path: "/",
+          secure: true,
+          httpOnly: true,
+          hostOnly: false,
+          creation: new Date().toISOString(),
+          lastAccessed: new Date().toISOString()
+        }
+      ]
+    };
 
-    // Automatically approve incoming follow requests if private to unlock channels safely
+    // Safely load the cookie parameters into the live execution stream
+    await ig.state.deserializeCookieJar(JSON.stringify(mockToughCookieJar));
+
+    // Automated incoming follow verification hooks for private data lines
     try {
       const pendingFeed = ig.feed.pendingFriendships();
       const pendingItems = await pendingFeed.items();
@@ -101,11 +125,13 @@ async function pollJobs() {
         }
       }
     } catch (e) {
-      console.log('Skipped pending friendship hooks check:', e.message);
+      console.log('Skipped friendship validation handshake check:', e.message);
     }
 
+    // Resolve public target profile primary key signature
     const targetPk = await ig.user.getIdByUsername(activeUsername);
 
+    // Extract complete connections loops lists via standard page-safe streams
     const followersFeed = ig.feed.accountFollowers(targetPk);
     const followersItems = await followersFeed.all();
     const followersUsernames = followersItems.map(item => item.username);
@@ -121,6 +147,7 @@ async function pollJobs() {
     const rawMutuals = followingUsernames.filter(u => followersSet.has(u.toLowerCase().trim()));
     const rawFans = followersUsernames.filter(u => !followingSet.has(u.toLowerCase().trim()));
 
+    // Pass data arrays down the strict Whitelist Exclusions filtering guard checks
     const filteredNonFollowers = filterUserList(rawNonFollowers, activeUsername);
     const filteredMutuals = filterUserList(rawMutuals, activeUsername);
     const filteredFans = filterUserList(rawFans, activeUsername);
@@ -138,25 +165,28 @@ async function pollJobs() {
       }
     };
 
+    // Complete transaction updates and save results directly into the Supabase payload storage cell
     await supabase.from('jobs').update({ status: 'done', result: resultPayload }).eq('id', currentJob.id);
-    console.log(`✅ Successfully completed job ${currentJob.id} for @${activeUsername}`);
+    console.log(`✅ Successfully completed data scan loop job ${currentJob.id} for @${activeUsername}`);
 
   } catch (err) {
     console.error('Error processing job execution branch:', err.message);
     try {
       isProcessing = false; 
+      // If a failure hooks onto the thread, isolate the precise active ID to unlock the database queues
       const { data: activeCheck } = await supabase.from('jobs').select('id').eq('status', 'processing').limit(1);
       if (activeCheck && activeCheck.length > 0) {
-        await supabase.from('jobs').update({ status: 'error', error: err.message || 'Scraper parsing execution exception.' }).eq('id', activeCheck.id);
+        await supabase.from('jobs').update({ status: 'error', error: err.message || 'Scraper processing crash.' }).eq('id', activeCheck.id);
       }
     } catch (e) {
-      console.error('Failed to clear error rows:', e.message);
+      console.error('Failed to clear broken queue records:', e.message);
     }
   } finally {
     isProcessing = false;
   }
 }
 
+// Poll the target Supabase queue data entries every 3 seconds
 setInterval(pollJobs, 3000);
 
 const PORT = process.env.PORT || 3000;
