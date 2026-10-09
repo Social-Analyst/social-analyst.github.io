@@ -70,7 +70,7 @@ async function pollJobs() {
 
     if (!jobs || jobs.length === 0) return;
 
-    // Correctly unpack the target job reference index row safely
+    // ✅ FIXED ACTION: Select index item 0 from the array pool envelope securely
     const currentJob = jobs[0];
     isProcessing = true;
 
@@ -82,17 +82,17 @@ async function pollJobs() {
     const activeUsername = currentJob.username.toLowerCase().trim();
     const ig = new IgApiClient();
 
-    // 🔓 COOKIE OVERRIDE INJECTION: Bypasses the broken JSON cookie jar parsing crash entirely
-    await ig.state.deserialize({
-      cookies: [{ key: 'sessionid', value: process.env.BOT_SESSION_COOKIE, domain: 'instagram.com', path: '/' }],
-      userAgent: 'Instagram 315.0.0.33.109 Android (29/10; 480dpi; 1080x2280; OnePlus; ONEPLUS A6003)'
-    });
+    // Generate basic mobile application client context fingerprint variables
+    ig.state.generateDevice(activeUsername);
     ig.state.appVersion = '315.0.0.33.109';
     ig.state.userAgent = 'Instagram 315.0.0.33.109 Android (29/10; 480dpi; 1080x2280; OnePlus; ONEPLUS A6003; enchilada; qcom; en_US; 564998083)';
 
+    // 🔓 RAW DIRECT INJECTION BIND: Sets the string cleanly into the base container jar fields, ignoring serialization validation
+    const rawCookieString = `sessionid=${process.env.BOT_SESSION_COOKIE}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
+    await ig.request.jar.setCookie(rawCookieString, 'https://instagram.com');
+
     // Automatically approve incoming follow connection logs if private to unlock channels safely
     try {
-      // FIX: Uses correct friend mapping property methods supported natively by private-api structures
       const pendingFeed = ig.feed.pendingFriendships();
       const pendingItems = await pendingFeed.items();
       if (pendingItems && pendingItems.length > 0) {
@@ -147,7 +147,7 @@ async function pollJobs() {
       isProcessing = false; 
       const { data: activeCheck } = await supabase.from('jobs').select('id').eq('status', 'processing').limit(1);
       if (activeCheck && activeCheck.length > 0) {
-        await supabase.from('jobs').update({ status: 'error', error: err.message || 'Scraper parsing execution exception.' }).eq('id', activeCheck[0].id);
+        await supabase.from('jobs').update({ status: 'error', error: err.message || 'Scraper parsing execution exception.' }).eq('id', activeCheck.id);
       }
     } catch (e) {
       console.error('Failed to clear error rows:', e.message);
