@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Social Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0b0e;
+      --card: #16161b;
+      --border: #2a2a31;
+      --muted: #8a8a93;
+      --fg: #f2f2f5;
+      --p-gradient: linear-gradient(135deg, #e1306c, #a259e1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    header {
+      text-align: center;
+      padding-top: 1rem;
+    }
+
+    h1.title {
+      font-size: clamp(36px, 7vw, 64px);
+      letter-spacing: -0.02em;
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 0.75rem;
+    }
+
+    .gradient-text {
+      background: var(--p-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: inline-block;
+    }
+
+    p.subtitle {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      min-width: 220px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.875rem 1rem;
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: #a259e1;
+    }
+
+    button.btn-submit {
+      background: var(--p-gradient);
+      border: none;
+      border-radius: 10px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0.875rem 1.5rem;
+      cursor: pointer;
+      transition: opacity 0.2s ease, transform 0.1s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    button.btn-submit:hover {
+      opacity: 0.92;
+    }
+
+    button.btn-submit:active {
+      transform: scale(0.98);
+    }
+
+    button.btn-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status-panel {
+      display: none;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem;
+      border-radius: 10px;
+      background-color: rgba(42, 42, 49, 0.5);
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--muted);
+      border-top-color: #a259e1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .results-container {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      gap: 1rem;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 0.75rem 0.25rem;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s ease;
+    }
+
+    .tab-btn.active {
+      color: var(--fg);
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--p-gradient);
+      border-radius: 2px;
+    }
+
+    .badge {
+      background-color: var(--border);
+      color: var(--fg);
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 12px;
+      margin-left: 0.35rem;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .user-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .user-card {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      text-decoration: none;
+      color: var(--fg);
+      transition: border-color 0.2s ease, transform 0.15s ease;
+    }
+
+    .user-card:hover {
+      border-color: #a259e1;
+      transform: translateY(-2px);
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--p-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .username-text {
+      font-weight: 500;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-shadow: none;
+      text-overflow: ellipsis;
+    }
+
+    .empty-msg {
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 2rem 0;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-top: auto;
+      padding: 1.5rem 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1 class="title">See who <span class="gradient-text">follows you back</span></h1>
+      <p class="subtitle">Sync your profile relationship data with deep-link mobile analytics.</p>
+    </header>
+
+    <main>
+      <div class="card">
+        <form id="analyzerForm" onsubmit="handleFormSubmit(event)">
+          <div class="form-group">
+            <label for="usernameInput">Instagram Username</label>
+            <div class="input-wrapper">
+              <input type="text" id="usernameInput" name="username" placeholder="e.g. alex_dev" required autocomplete="off" spellcheck="false">
+              <button type="submit" id="submitBtn" class="btn-submit">
+                <span>Analyze Profile</span>
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div id="statusPanel" class="status-panel" style="margin-top: 1.25rem;">
+          <div class="spinner" id="statusSpinner"></div>
+          <span id="statusText">Initializing request...</span>
+        </div>
+      </div>
+
+      <div id="resultsContainer" class="results-container" style="margin-top: 2rem;">
+        <div class="card">
+          <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('nonfollowers')">
+              Non-Followers <span id="nonfollowersCount" class="badge">0</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('mutuals')">
+              Mutuals <span id="mutualsCount" class="badge">0</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('fans')">
+              Fans <span id="fansCount" class="badge">0</span>
+            </button>
+          </div>
+
+          <div style="padding-top: 1.25rem;">
+            <div id="tab-nonfollowers" class="tab-content active">
+              <div id="grid-nonfollowers" class="user-grid"></div>
+            </div>
+            <div id="tab-mutuals" class="tab-content">
+              <div id="grid-mutuals" class="user-grid"></div>
+            </div>
+            <div id="tab-fans" class="tab-content">
+              <div id="grid-fans" class="user-grid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>Social Analyzer &bull; Clean Data Sync Pipeline</p>
+    </footer>
+  </div>
+
+  <script>
+    // ==========================================
+    // 🔑 CONFIGURATION PANEL (MANUALLY SET)
+    // ==========================================
+    const SUPABASE_URL = "https://supabase.co";
+    const SUPABASE_ANON = "PASTE_YOUR_SUPABASE_ANON_PUBLIC_KEY_HERE";
+    const SYSTEM_WHITELIST = ["joshfz"];
+    // ==========================================
+
+    // Helper functions
+    function escapeHtml(str) {
+      if (typeof str !== 'string') return '';
+      return str.replace(/[&<>"']/g, function (m) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[m];
+      });
+    }
+
+    let activeJobId = null;
+    let pollInterval = null;
+
+    function isUserWhitelisted(handle) {
+      if (!handle) return false;
+      const lower = handle.toLowerCase();
+      return SYSTEM_WHITELIST.some(item => item.toLowerCase() === lower);
+    }
+
+    function filterUserList(userList, activeUsername) {
+      if (!Array.isArray(userList)) return [];
+      const activeLower = (activeUsername || '').toLowerCase();
+      
+      return userList.filter(user => {
+        const handle = typeof user === 'string' ? user : (user.username || '');
+        if (!handle) return false;
+        
+        if (isUserWhitelisted(handle)) {
+          // Exception: Whitelisted handle is only permitted if it matches active profile running the sync
+          return handle.toLowerCase() === activeLower;
+        }
+        return true;
+      });
+    }
+
+    function switchTab(tabName) {
+      const tabs = ['nonfollowers', 'mutuals', 'fans'];
+      tabs.forEach(t => {
+        const btn = document.querySelector(`button[onclick="switchTab('${t}')"]`);
+        const content = document.getElementById(`tab-${t}`);
+        if (t === tabName) {
+          if (btn) btn.classList.add('active');
+          if (content) content.classList.add('active');
+        } else {
+          if (btn) btn.classList.remove('active');
+          if (content) content.classList.remove('active');
+        }
+      });
+    }
+
+    async function handleFormSubmit(event) {
+      // e.preventDefault() MUST run as the absolute first line
+      if (event && event.preventDefault) {
+        event.preventDefault();
+      }
+
+      const inputEl = document.getElementById('usernameInput');
+      const submitBtn = document.getElementById('submitBtn');
+      const statusPanel = document.getElementById('statusPanel');
+      const statusText = document.getElementById('statusText');
+      const statusSpinner = document.getElementById('statusSpinner');
+      const resultsContainer = document.getElementById('resultsContainer');
+
+      const targetUsername = inputEl.value.trim().replace(/^@/, '');
+      if (!targetUsername) return;
+
+      submitBtn.disabled = true;
+      statusPanel.style.display = 'flex';
+      statusSpinner.style.display = 'block';
+      statusText.textContent = `Queueing synchronization job for @${targetUsername}...`;
+      resultsContainer.style.display = 'none';
+
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+
+      try {
+        // Push job directly to Supabase REST endpoint (/rest/v1/jobs)
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON,
+            'Authorization': `Bearer ${SUPABASE_ANON}`,
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            username: targetUsername,
+            status: 'pending'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to create job: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const createdJob = Array.isArray(data) ? data[0] : data;
+        
+        if (!createdJob || !createdJob.id) {
+          throw new Error('Invalid response payload from server.');
+        }
+
+        activeJobId = createdJob.id;
+        statusText.textContent = `Job queued. Polling background worker...`;
+
+        // Begin polling loop every 3 seconds
+        pollInterval = setInterval(() => {
+          pollJobStatus(activeJobId, targetUsername);
+        }, 3000);
+
+        // Immediate first poll
+        pollJobStatus(activeJobId, targetUsername);
+
+      } catch (err) {
+        console.error(err);
+        statusSpinner.style.display = 'none';
+        statusText.textContent = `Error: ${err.message || 'Failed to submit job.'}`;
+        submitBtn.disabled = false;
+      }
+    }
+
+    async function pollJobStatus(jobId, targetUsername) {
+      const statusText = document.getElementById('statusText');
+      const statusSpinner = document.getElementById('statusSpinner');
+      const submitBtn = document.getElementById('submitBtn');
+
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_job`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON,
+            'Authorization': `Bearer ${SUPABASE_ANON}`
+          },
+          body: JSON.stringify({ p_id: jobId })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Polling request failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        // Parse index 0 array envelope
+        const job = Array.isArray(data) ? data[0] : data;
+
+        if (!job) {
+          return;
+        }
+
+        if (job.status === 'pending') {
+          statusText.textContent = `Job pending in queue...`;
+        } else if (job.status === 'processing') {
+          statusText.textContent = `Worker analyzing Instagram relationships for @${targetUsername}...`;
+        } else if (job.status === 'done') {
+          clearInterval(pollInterval);
+          pollInterval = null;
+
+          statusSpinner.style.display = 'none';
+          statusText.textContent = `Synchronization complete!`;
+          submitBtn.disabled = false;
+
+          renderResults(job.result, targetUsername);
+        } else if (job.status === 'error') {
+          clearInterval(pollInterval);
+          pollInterval = null;
+
+          statusSpinner.style.display = 'none';
+          statusText.textContent = `Analysis failed: ${job.error || 'Unknown error occurred.'}`;
+          submitBtn.disabled = false;
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }
+
+    function renderResults(resultPayload, activeUsername) {
+      const resultsContainer = document.getElementById('resultsContainer');
+      resultsContainer.style.display = 'flex';
+
+      const rawNonFollowers = resultPayload?.non_followers || resultPayload?.nonFollowers || [];
+      const rawMutuals = resultPayload?.mutuals || [];
+      const rawFans = resultPayload?.fans || [];
+
+      // Apply whitelist filter
+      const filteredNonFollowers = filterUserList(rawNonFollowers, activeUsername);
+      const filteredMutuals = filterUserList(rawMutuals, activeUsername);
+      const filteredFans = filterUserList(rawFans, activeUsername);
+
+      // Update counters
+      document.getElementById('nonfollowersCount').textContent = filteredNonFollowers.length;
+      document.getElementById('mutualsCount').textContent = filteredMutuals.length;
+      document.getElementById('fansCount').textContent = filteredFans.length;
+
+      // Render grids
+      renderUserGrid('grid-nonfollowers', filteredNonFollowers);
+      renderUserGrid('grid-mutuals', filteredMutuals);
+      renderUserGrid('grid-fans', filteredFans);
+    }
+
+    function renderUserGrid(elementId, users) {
+      const grid = document.getElementById(elementId);
+      if (!grid) return;
+
+      if (!users || users.length === 0) {
+        grid.innerHTML = `<div class="empty-msg" style="grid-column: 1/-1;">No users found in this category.</div>`;
+        return;
+      }
+
+      const html = users.map(u => {
+        const username = typeof u === 'string' ? u : u.username;
+        const initial = escapeHtml((username || '?')[0].toUpperCase());
+        const safeUsername = escapeHtml(username);
+        // Deep link protocol: instagram://user?username=username
+        return `
+          <a class="user-card" href="instagram://user?username=${safeUsername}" target="_blank" rel="noopener noreferrer">
+            <div class="avatar">${initial}</div>
+            <span class="username-text">@${safeUsername}</span>
+          </a>
+        `;
+      }).join('');
+
+      grid.innerHTML = html;
+    }
+  </script>
+</body>
+</html>
