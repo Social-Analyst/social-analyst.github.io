@@ -70,7 +70,7 @@ async function pollJobs() {
 
     if (!jobs || jobs.length === 0) return;
 
-    // Unpack the current database query row safely
+    // Unpack the active database row item safely from the array envelope
     const currentJob = jobs[0];
     isProcessing = true;
 
@@ -82,37 +82,18 @@ async function pollJobs() {
     const activeUsername = currentJob.username.toLowerCase().trim();
     const ig = new IgApiClient();
 
-    // Generate native device layout specs
+    // 1. Generate core state fingerprint variables natively
     ig.state.generateDevice(activeUsername);
     ig.state.appVersion = '315.0.0.33.109';
     ig.state.userAgent = 'Instagram 315.0.0.33.109 Android (29/10; 480dpi; 1080x2280; OnePlus; ONEPLUS A6003; enchilada; qcom; en_US; 564998083)';
 
-    // 🔓 THE ULTIMATE JAR RESOLUTION: Emulate a complete structural Tough-Cookie state object map.
-    // This provides the exact 'cookies' nested arrays layout requested by the deserializer wrapper.
-    const structuredJarPayload = {
-      version: "tough-cookie@4.1.3",
-      storeType: "MemoryCookieStore",
-      rejectPublicSuffixes: true,
-      enableLooseMode: true,
-      cookies: [
-        {
-          key: "sessionid",
-          value: process.env.BOT_SESSION_COOKIE.trim(),
-          domain: "instagram.com",
-          path: "/",
-          secure: true,
-          httpOnly: true,
-          hostOnly: false,
-          creation: new Date().toISOString(),
-          lastAccessed: new Date().toISOString()
-        }
-      ]
-    };
+    // 2. 🔓 THE BULLETPROOF INJECTION ROUTINE: 
+    // We let the library build its own native, compiled cookie jar infrastructure first on state generation,
+    // then cleanly inject your raw session string directly into that live runtime jar instance.
+    const cookieString = `sessionid=${process.env.BOT_SESSION_COOKIE.trim()}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
+    await ig.request.jar.setCookie(cookieString, 'https://instagram.com');
 
-    // Deserialize the structural payload map cleanly to bypass jar validation checks
-    await ig.state.deserializeCookieJar(JSON.stringify(structuredJarPayload));
-
-    // Automatically approve incoming follow connection logs if private to unlock channels safely
+    // Automatically approve incoming follow requests if private to unlock channels safely
     try {
       const pendingFeed = ig.feed.pendingFriendships();
       const pendingItems = await pendingFeed.items();
