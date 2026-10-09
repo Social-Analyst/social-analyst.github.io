@@ -1,0 +1,17 @@
+{
+  "name": "social-analyzer-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Background worker for the Social Analyzer dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "instagram-private-api": "^1.46.1",
+    "tough-cookie": "^4.1.4"
+  }
+}
