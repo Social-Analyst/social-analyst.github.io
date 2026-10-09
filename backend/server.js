@@ -70,7 +70,7 @@ async function pollJobs() {
 
     if (!jobs || jobs.length === 0) return;
 
-    // Correctly unpack the target job reference row safely
+    // Unpack the current database query row safely
     const currentJob = jobs[0];
     isProcessing = true;
 
@@ -82,25 +82,35 @@ async function pollJobs() {
     const activeUsername = currentJob.username.toLowerCase().trim();
     const ig = new IgApiClient();
 
-    // Generate state fingerprint variables
+    // Generate native device layout specs
     ig.state.generateDevice(activeUsername);
     ig.state.appVersion = '315.0.0.33.109';
     ig.state.userAgent = 'Instagram 315.0.0.33.109 Android (29/10; 480dpi; 1080x2280; OnePlus; ONEPLUS A6003; enchilada; qcom; en_US; 564998083)';
 
-    // 🔓 THE BULLETPROOF INJECTION: Seed the session state directly through the official state storage engine middleware
-    // This auto-creates the internal request client jar structure to prevent 'undefined' crashes completely.
-    await ig.state.deserialize({
+    // 🔓 THE ULTIMATE JAR RESOLUTION: Emulate a complete structural Tough-Cookie state object map.
+    // This provides the exact 'cookies' nested arrays layout requested by the deserializer wrapper.
+    const structuredJarPayload = {
+      version: "tough-cookie@4.1.3",
+      storeType: "MemoryCookieStore",
+      rejectPublicSuffixes: true,
+      enableLooseMode: true,
       cookies: [
         {
-          key: 'sessionid',
+          key: "sessionid",
           value: process.env.BOT_SESSION_COOKIE.trim(),
-          domain: 'instagram.com',
-          path: '/',
+          domain: "instagram.com",
+          path: "/",
           secure: true,
-          httpOnly: true
+          httpOnly: true,
+          hostOnly: false,
+          creation: new Date().toISOString(),
+          lastAccessed: new Date().toISOString()
         }
       ]
-    });
+    };
+
+    // Deserialize the structural payload map cleanly to bypass jar validation checks
+    await ig.state.deserializeCookieJar(JSON.stringify(structuredJarPayload));
 
     // Automatically approve incoming follow connection logs if private to unlock channels safely
     try {
