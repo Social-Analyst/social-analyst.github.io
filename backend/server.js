@@ -44,7 +44,7 @@ function filterUserList(userList, activeUsername) {
     const cleanHandle = handle.toLowerCase().trim();
 
     if (isUserWhitelisted(cleanHandle)) {
-      return cleanHandle === activeLower; // Visible ONLY if whitelisted user is running their own session
+      return cleanHandle === activeLower; 
     }
     return true;
   });
@@ -70,7 +70,7 @@ async function pollJobs() {
 
     if (!jobs || jobs.length === 0) return;
 
-    // ✅ FIXED ACTION: Select index item 0 from the array pool envelope securely
+    // Correctly unpack the target job reference row safely
     const currentJob = jobs[0];
     isProcessing = true;
 
@@ -82,14 +82,25 @@ async function pollJobs() {
     const activeUsername = currentJob.username.toLowerCase().trim();
     const ig = new IgApiClient();
 
-    // Generate basic mobile application client context fingerprint variables
+    // Generate state fingerprint variables
     ig.state.generateDevice(activeUsername);
     ig.state.appVersion = '315.0.0.33.109';
     ig.state.userAgent = 'Instagram 315.0.0.33.109 Android (29/10; 480dpi; 1080x2280; OnePlus; ONEPLUS A6003; enchilada; qcom; en_US; 564998083)';
 
-    // 🔓 RAW DIRECT INJECTION BIND: Sets the string cleanly into the base container jar fields, ignoring serialization validation
-    const rawCookieString = `sessionid=${process.env.BOT_SESSION_COOKIE}; Domain=.instagram.com; Path=/; Secure; HttpOnly`;
-    await ig.request.jar.setCookie(rawCookieString, 'https://instagram.com');
+    // 🔓 THE BULLETPROOF INJECTION: Seed the session state directly through the official state storage engine middleware
+    // This auto-creates the internal request client jar structure to prevent 'undefined' crashes completely.
+    await ig.state.deserialize({
+      cookies: [
+        {
+          key: 'sessionid',
+          value: process.env.BOT_SESSION_COOKIE.trim(),
+          domain: 'instagram.com',
+          path: '/',
+          secure: true,
+          httpOnly: true
+        }
+      ]
+    });
 
     // Automatically approve incoming follow connection logs if private to unlock channels safely
     try {
