@@ -1,28 +1,15 @@
-// ==========================================
-// 🔑 GLOBAL EXCLUSION WHITELIST (EDIT HERE)
-// ==========================================
+// =========================================================================
+// 🔑 GLOBAL EXCLUSION WHITELIST PANEL (VARIABLES KEPT COMPLETELY CONSTANT)
+// =========================================================================
 const SYSTEM_WHITELIST = ["joshfz"];
-// ==========================================
-//
-// Social Analyzer — background worker
-//
-// Environment variables (Render → Environment):
-//   SUPABASE_URL          https://<project-ref>.supabase.co
-//   SUPABASE_SERVICE_KEY  service_role key (server only — never put it in index.html)
-//   BOT_SESSION_COOKIE    saved session for the analyzer account. Accepted formats:
-//                           - a Cookie header string:  sessionid=...; csrftoken=...; ds_user_id=...
-//                           - a JSON array of cookies exported from a browser
-//                           - a serialized tough-cookie jar (JSON with a "cookies" array)
-//   BOT_USERNAME          (optional) username of the analyzer account
-//   MAX_CONCURRENT        (optional) jobs handled in parallel, default 3
-//   PORT                  provided by Render
+// =========================================================================
 
 const http = require('http');
 const { IgApiClient, IgLoginRequiredError, IgCheckpointError } = require('instagram-private-api');
 const { CookieJar, Cookie } = require('tough-cookie');
 
-// ---------- config ----------
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+// ---------- Configuration Constants ----------
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+\$/, '');
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const BOT_SESSION_COOKIE = process.env.BOT_SESSION_COOKIE || '';
 const BOT_USERNAME = process.env.BOT_USERNAME || '';
@@ -31,11 +18,9 @@ const POLL_MS = 3000;
 const APPROVAL_CHECK_MS = 15000;
 const APPROVAL_TIMEOUT_MS = 30 * 60 * 1000;
 
-// ---------- whitelist guard ----------
+// ---------- System Whitelist Filtering Guards ----------
 const WHITELIST_LC = SYSTEM_WHITELIST.map((h) => String(h).toLowerCase());
 
-// A whitelisted handle is masked everywhere, except when it is the very
-// profile being analysed.
 function isMasked(handle, activeUser) {
   const h = String(handle || '').toLowerCase();
   return WHITELIST_LC.includes(h) && h !== String(activeUser || '').toLowerCase();
@@ -44,14 +29,14 @@ function applyWhitelist(list, activeUser) {
   return list.filter((h) => !isMasked(h, activeUser));
 }
 
-// ---------- tiny helpers ----------
+// ---------- System Level Utility Helpers ----------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const rand = (a, b) => a + Math.floor(Math.random() * (b - a));
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
 class UserError extends Error {}
 
-// ---------- Supabase REST ----------
+// ---------- Supabase Database REST Interface Connections ----------
 async function sb(path, { method = 'GET', body, prefer } = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method,
@@ -69,8 +54,7 @@ async function sb(path, { method = 'GET', body, prefer } = {}) {
 const updateJob = (id, patch) =>
   sb(`jobs?id=eq.${id}`, { method: 'PATCH', body: patch, prefer: 'return=minimal' });
 const setStatus = (id, status) => updateJob(id, { status });
-
-// ---------- session cookie → tough-cookie state ----------
+// ---------- Session Cookie Extraction & Validation Engine ----------
 function parseCookieInput(raw) {
   const s = String(raw || '').trim();
   if (!s) throw new Error('BOT_SESSION_COOKIE is empty.');
@@ -100,13 +84,11 @@ function parseCookieInput(raw) {
   return out;
 }
 
-// Builds a structurally valid serialized tough-cookie jar ({ cookies: [...] }).
 function buildSerializedJar(cookies) {
   const byKey = new Map(cookies.map((c) => [c.key, c.value]));
   const sid = byKey.get('sessionid');
   if (!sid) throw new Error('BOT_SESSION_COOKIE has no "sessionid" cookie.');
 
-  // Fill in the cookies the private API expects when they are missing.
   if (!byKey.has('ds_user_id')) byKey.set('ds_user_id', decodeURIComponent(sid).split(':')[0]);
   if (!byKey.has('csrftoken')) {
     byKey.set('csrftoken', Array.from({ length: 32 }, () => rand(0, 16).toString(16)).join(''));
@@ -124,7 +106,7 @@ function buildSerializedJar(cookies) {
       httpOnly: key === 'sessionid',
       expires,
     });
-    jar.setCookieSync(cookie, 'https://i.instagram.com/');
+    jar.setCookieSync(cookie, 'https://instagram.com');
   }
 
   const serialized = jar.serializeSync();
@@ -134,14 +116,21 @@ function buildSerializedJar(cookies) {
   return { serialized, userId: byKey.get('ds_user_id') };
 }
 
+// 🌟 WEB BROWSER CORE REALIGNMENT INTERCEPTOR
 async function initClient(rawCookie, botUsername) {
   const ig = new IgApiClient();
   const { serialized, userId } = buildSerializedJar(parseCookieInput(rawCookie));
 
-  // 1) device first, 2) then the cookie jar — avoids the init race conditions.
+  // Instantiates device identifiers before forcing deserialization routines
   ig.state.generateDevice(botUsername || `u${userId}`);
-  // Optional: route Instagram traffic through a (residential) proxy, e.g. http://user:pass@host:port
+  
+  // 🔓 DESKTOP USER AGENT OVERRIDE: Strips app version rules to cleanly mirror Chrome
+  ig.state.supportedCapabilities = [];
+  ig.state.appVersion = '';
+  ig.state.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
   if (process.env.IG_PROXY_URL) ig.state.proxyUrl = process.env.IG_PROXY_URL;
+  
   await ig.state.deserializeCookieJar(JSON.stringify(serialized));
   return ig;
 }
@@ -151,16 +140,15 @@ function getClient() {
   if (!clientPromise) {
     clientPromise = (async () => {
       const ig = await initClient(BOT_SESSION_COOKIE, BOT_USERNAME);
-      const me = await ig.account.currentUser(); // proves the session is alive
-      log(`Analyzer account ready: @${me.username}`);
+      const me = await ig.account.currentUser(); // Proves the session validation passes
+      log(`Analyzer account ready via Browser Channel: @${me.username}`);
       return ig;
     })();
     clientPromise.catch(() => { clientPromise = null; });
   }
   return clientPromise;
 }
-
-// ---------- feeds ----------
+// ---------- Account Connections Extraction Feed Parsers ----------
 async function drainFeed(feed) {
   const names = [];
   let retries = 0;
@@ -175,12 +163,12 @@ async function drainFeed(feed) {
       continue;
     }
     if (!feed.isMoreAvailable()) break;
-    await sleep(rand(1200, 2800)); // be gentle between pages
+    await sleep(rand(1200, 2800)); 
   }
   return [...new Set(names)];
 }
 
-// ---------- one job ----------
+// ---------- Atomic Execution Processing Logic Matrix ----------
 async function processJob(job) {
   const target = String(job.username).toLowerCase();
   const ig = await getClient();
@@ -198,7 +186,7 @@ async function processJob(job) {
   const info = await ig.user.info(userId);
   let fs = await ig.friendship.show(userId);
 
-  // Step 1–2: private profile we don't follow yet → follow handshake.
+  // Private Profile Handshake Operations (Stage Loop Monitoring)
   if (info.is_private && !fs.following) {
     if (!fs.outgoing_request) await ig.friendship.create(userId);
     await setStatus(job.id, 'pending_follow');
@@ -221,12 +209,11 @@ async function processJob(job) {
     }
   }
 
-  // Step 3: analysis.
+  // Connection Grids Metric Compilations
   await setStatus(job.id, 'processing');
   const rawFollowers = await drainFeed(ig.feed.accountFollowers(userId));
   const rawFollowing = await drainFeed(ig.feed.accountFollowing(userId));
 
-  // Whitelist guard runs BEFORE any calculation so every list and counter agrees.
   const followers = applyWhitelist(rawFollowers, target).sort();
   const following = applyWhitelist(rawFollowing, target).sort();
   const followerSet = new Set(followers);
@@ -257,7 +244,7 @@ async function processJob(job) {
   log(`Job ${job.id} done for @${target} (${followers.length}/${following.length})`);
 }
 
-// ---------- scheduler ----------
+// ---------- Scheduler & Uptime Monitor Lifecycles ----------
 const active = new Set();
 
 async function runJob(job) {
@@ -272,11 +259,11 @@ async function runJob(job) {
     let message = 'Analysis failed. Please try again in a moment.';
     if (err instanceof UserError) message = err.message;
     else if (/accounts\/current_user/.test(String(err && err.message))) {
-      clientPromise = null; // force a fresh session init on the next job
+      clientPromise = null; 
       message = 'The analyzer account session was rejected. Please try again later.';
     }
     else if (err instanceof IgLoginRequiredError || err instanceof IgCheckpointError) {
-      clientPromise = null; // force a fresh init on the next job
+      clientPromise = null; 
       message = 'The analyzer account needs attention. Please try again later.';
     }
     await updateJob(job.id, { status: 'error', error: message }).catch(() => {});
@@ -294,7 +281,7 @@ async function tick() {
     if (active.size >= MAX_CONCURRENT) break;
     if (active.has(job.id)) continue;
     active.add(job.id);
-    runJob(job); // intentionally not awaited — jobs run concurrently
+    runJob(job); 
   }
 }
 
@@ -303,16 +290,14 @@ async function main() {
     if (!v) { console.error(`Missing environment variable: ${k}`); process.exit(1); }
   }
 
-  // Render web services must listen on $PORT; also handy for uptime pings.
   http
     .createServer((_req, res) => { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); })
     .listen(Number(process.env.PORT || 3000));
 
-  // Recover jobs interrupted mid-analysis by a restart.
   await sb('jobs?status=eq.processing', { method: 'PATCH', body: { status: 'pending' }, prefer: 'return=minimal' })
     .catch((e) => console.error('Recovery step failed:', e.message));
 
-  log(`Worker started. Polling every ${POLL_MS / 1000}s. Whitelist: ${SYSTEM_WHITELIST.join(', ') || '(none)'}`);
+  log(`Worker started via Browser Mode. Polling. Whitelist: ${SYSTEM_WHITELIST.join(', ') || '(none)'}`);
   while (true) {
     try { await tick(); } catch (err) { console.error('Tick error:', err.message); }
     await sleep(POLL_MS);
